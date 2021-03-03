@@ -59,17 +59,17 @@ contract GMT is IERC20, IGMT {
         gov = _gov;
     }
 
-    function setNextMigrationTime(uint256 _migrationTime) external onlyGov {
-        require(_migrationTime > migrationTime, "GMT: invalid _migrationTime");
-        migrationTime = _migrationTime;
-    }
-
     function addAdmin(address _account) external onlyGov {
         admins[_account] = true;
     }
 
     function removeAdmin(address _account) external onlyGov {
         admins[_account] = false;
+    }
+
+    function setNextMigrationTime(uint256 _migrationTime) external onlyGov {
+        require(_migrationTime > migrationTime, "GMT: invalid _migrationTime");
+        migrationTime = _migrationTime;
     }
 
     function beginMigration() external override onlyAdmin {
