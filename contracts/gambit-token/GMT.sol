@@ -23,14 +23,17 @@ contract GMT is IERC20 {
 
     // only checked when hasActiveMigration is true
     // this can be used to block the AMM pair as a recipient
-    // which would disable adding liquidity and selling GMT during a migration
+    // and protect liquidity providers during a migration
+    // by disabling the selling of GMT
     mapping (address => bool) public blockedRecipients;
 
     // only checked when hasActiveMigration is true
     // this can be used for:
     // - only allowing tokens to be transferred by the distribution contract
-    // during the initial distribution phase
-    // - only allowing liquidity to be removed during the migration phase
+    // during the initial distribution phase, this would prevent token buyers
+    // from adding liquidity before the initial liquidity is seeded
+    // - only allowing removal of GMT liquidity and no other actions
+    // during the migration phase
     mapping (address => bool) public allowedMsgSenders;
 
     modifier onlyGov() {
@@ -39,9 +42,6 @@ contract GMT is IERC20 {
     }
 
     constructor(uint256 _initialSupply) public {
-        // set hasActiveMigration to true to carry out
-        // the initial token distribution
-        hasActiveMigration = true;
         gov = msg.sender;
         _mint(msg.sender, _initialSupply);
     }
