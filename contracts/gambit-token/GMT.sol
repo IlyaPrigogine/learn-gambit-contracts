@@ -2,8 +2,8 @@
 
 pragma solidity 0.6.12;
 
-import "../libraries/token/IERC20.sol";
 import "../libraries/math/SafeMath.sol";
+import "../libraries/token/IERC20.sol";
 
 contract GMT is IERC20 {
     using SafeMath for uint256;
