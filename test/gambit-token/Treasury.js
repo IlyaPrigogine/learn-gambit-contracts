@@ -19,8 +19,8 @@ describe("Treasury", function () {
 
   let gmtPresalePrice = 4.5 * PRECISION
   let gmtListingPrice = 5 * PRECISION
-  let maxBusdAmount = expandDecimals(2000, 18)
-  let busdHardcap = expandDecimals(900 * 1000, 18)
+  let busdSlotCap = expandDecimals(2000, 18)
+  let busdHardCap = expandDecimals(900 * 1000, 18)
   let busdBasisPoints = 5000 // 50%
   let unlockTime
 
@@ -43,8 +43,8 @@ describe("Treasury", function () {
       [
         gmtPresalePrice,
         gmtListingPrice,
-        maxBusdAmount,
-        busdHardcap,
+        busdSlotCap,
+        busdHardCap,
         busdBasisPoints,
         unlockTime
       ]
@@ -68,8 +68,8 @@ describe("Treasury", function () {
       [
         gmtPresalePrice,
         gmtListingPrice,
-        maxBusdAmount,
-        busdHardcap,
+        busdSlotCap,
+        busdHardCap,
         busdBasisPoints,
         unlockTime
       ]
@@ -85,8 +85,8 @@ describe("Treasury", function () {
       [
         gmtPresalePrice,
         gmtListingPrice,
-        maxBusdAmount,
-        busdHardcap,
+        busdSlotCap,
+        busdHardCap,
         busdBasisPoints,
         unlockTime
       ]
@@ -101,8 +101,8 @@ describe("Treasury", function () {
 
     expect(await treasury.gmtPresalePrice()).eq(gmtPresalePrice)
     expect(await treasury.gmtListingPrice()).eq(gmtListingPrice)
-    expect(await treasury.maxBusdAmount()).eq(maxBusdAmount)
-    expect(await treasury.busdHardcap()).eq(busdHardcap)
+    expect(await treasury.busdSlotCap()).eq(busdSlotCap)
+    expect(await treasury.busdHardCap()).eq(busdHardCap)
     expect(await treasury.busdBasisPoints()).eq(busdBasisPoints)
     expect(await treasury.unlockTime()).eq(unlockTime)
   })
@@ -132,6 +132,9 @@ describe("Treasury", function () {
   it("extendUnlockTime", async () => {
     await expect(treasury.connect(user0).extendUnlockTime(unlockTime + 100))
       .to.be.revertedWith("Treasury: forbidden")
+
+    await expect(treasury.extendUnlockTime(unlockTime - 100))
+      .to.be.revertedWith("Treasury: invalid _unlockTime")
 
     expect(await treasury.unlockTime()).eq(unlockTime)
 
@@ -250,6 +253,9 @@ describe("Treasury", function () {
     expect(await gmt.balanceOf(treasury.address)).eq("999999999999999999999556")
     expect(await gmt.balanceOf(user0.address)).eq(444)
 
+    await expect(gmt.connect(user0).transfer(user1.address, 100))
+      .to.be.revertedWith("GMT: forbidden msg.sender")
+
     await treasury.connect(user0).swap(1000)
 
     expect(await treasury.swapAmounts(user0.address)).eq(3000)
@@ -260,7 +266,7 @@ describe("Treasury", function () {
     expect(await gmt.balanceOf(user0.address)).eq(666)
   })
 
-  it("validates swap.maxBusdAmount", async () => {
+  it("validates swap.busdSlotCap", async () => {
     await busd.mint(user0.address, expandDecimals(1000 * 1000, 18))
 
     const whitelist = [user0.address, user1.address, user2.address]
@@ -277,7 +283,7 @@ describe("Treasury", function () {
     expect(await gmt.balanceOf(user0.address)).eq(0)
 
     await expect(treasury.connect(user0).swap(expandDecimals(2001, 18)))
-      .to.be.revertedWith("Treasury: maxBusdAmount exceeded")
+      .to.be.revertedWith("Treasury: busdSlotCap exceeded")
 
     await treasury.connect(user0).swap(expandDecimals(1000, 18))
 
@@ -289,7 +295,7 @@ describe("Treasury", function () {
     expect(await gmt.balanceOf(user0.address)).eq("222222222222222222222")
 
     await expect(treasury.connect(user0).swap(expandDecimals(1001, 18)))
-      .to.be.revertedWith("Treasury: maxBusdAmount exceeded")
+      .to.be.revertedWith("Treasury: busdSlotCap exceeded")
 
     await treasury.connect(user0).swap(expandDecimals(1000, 18))
 
@@ -301,10 +307,10 @@ describe("Treasury", function () {
     expect(await gmt.balanceOf(user0.address)).eq("444444444444444444444")
 
     await expect(treasury.connect(user0).swap("1"))
-      .to.be.revertedWith("Treasury: maxBusdAmount exceeded")
+      .to.be.revertedWith("Treasury: busdSlotCap exceeded")
   })
 
-  it("validates swap.busdHardcap", async () => {
+  it("validates swap.busdHardCap", async () => {
     await busd.mint(user0.address, expandDecimals(1000 * 1000, 18))
 
     const whitelist = [user0.address, user1.address, user2.address]
@@ -315,19 +321,19 @@ describe("Treasury", function () {
 
     expect(await treasury.busdReceived()).eq(0)
     await expect(treasury.connect(user0).swap(expandDecimals(901 * 1000, 18)))
-      .to.be.revertedWith("Treasury: busdHardcap exceeded")
+      .to.be.revertedWith("Treasury: busdHardCap exceeded")
 
     await expect(treasury.connect(user0).swap(expandDecimals(900 * 1000, 18)))
-      .to.be.revertedWith("Treasury: maxBusdAmount exceeded")
+      .to.be.revertedWith("Treasury: busdSlotCap exceeded")
 
     await treasury.connect(user0).swap(expandDecimals(2000, 18))
     expect(await treasury.busdReceived()).eq(expandDecimals(2000, 18))
 
     await expect(treasury.connect(user0).swap(expandDecimals(899 * 1000, 18)))
-      .to.be.revertedWith("Treasury: busdHardcap exceeded")
+      .to.be.revertedWith("Treasury: busdHardCap exceeded")
 
     await expect(treasury.connect(user0).swap(expandDecimals(898 * 1000, 18)))
-      .to.be.revertedWith("Treasury: maxBusdAmount exceeded")
+      .to.be.revertedWith("Treasury: busdSlotCap exceeded")
   })
 
   it("validates swap.isSwapActive", async () => {

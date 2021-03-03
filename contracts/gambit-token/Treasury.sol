@@ -26,8 +26,8 @@ contract Treasury is ReentrancyGuard {
 
     uint256 public gmtPresalePrice;
     uint256 public gmtListingPrice;
-    uint256 public maxBusdAmount;
-    uint256 public busdHardcap;
+    uint256 public busdSlotCap;
+    uint256 public busdHardCap;
     uint256 public busdBasisPoints;
     uint256 public unlockTime;
 
@@ -61,8 +61,8 @@ contract Treasury is ReentrancyGuard {
 
         gmtPresalePrice = _values[0];
         gmtListingPrice = _values[1];
-        maxBusdAmount = _values[2];
-        busdHardcap = _values[3];
+        busdSlotCap = _values[2];
+        busdHardCap = _values[3];
         busdBasisPoints = _values[4];
         unlockTime = _values[5];
     }
@@ -76,6 +76,7 @@ contract Treasury is ReentrancyGuard {
     }
 
     function extendUnlockTime(uint256 _unlockTime) external onlyGov nonReentrant {
+        require(_unlockTime > unlockTime, "Treasury: invalid _unlockTime");
         unlockTime = _unlockTime;
     }
 
@@ -106,10 +107,10 @@ contract Treasury is ReentrancyGuard {
         require(_busdAmount > 0, "Treasury: invalid _busdAmount");
 
         busdReceived = busdReceived.add(_busdAmount);
-        require(busdReceived <= busdHardcap, "Treasury: busdHardcap exceeded");
+        require(busdReceived <= busdHardCap, "Treasury: busdHardCap exceeded");
 
         swapAmounts[account] = swapAmounts[account].add(_busdAmount);
-        require(swapAmounts[account] <= maxBusdAmount, "Treasury: maxBusdAmount exceeded");
+        require(swapAmounts[account] <= busdSlotCap, "Treasury: busdSlotCap exceeded");
 
         // receive BUSD
         uint256 busdBefore = IERC20(busd).balanceOf(address(this));
