@@ -51,7 +51,7 @@ contract Token is IERC20 {
      * All three of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor () public {
+    constructor() public {
         _name = "Token";
         _symbol = "TOKEN";
         _decimals = 18;

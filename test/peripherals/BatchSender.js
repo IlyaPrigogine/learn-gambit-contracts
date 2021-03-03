@@ -28,6 +28,9 @@ describe("BatchSender", function () {
       const accounts = [user0.address, user1.address, user2.address, user3.address]
       const amounts = [100, 200, 300, 400]
 
+      await expect(batchSender.connect(user0).send(token.address, accounts, amounts))
+        .to.be.revertedWith("BatchSender: forbidden")
+
       await token.approve(batchSender.address, 1000)
       await batchSender.send(token.address, accounts, amounts)
 
