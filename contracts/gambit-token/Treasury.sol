@@ -24,7 +24,8 @@ contract Treasury is ReentrancyGuard {
     address public router;
     address public fund;
 
-    uint256 public gmtPrice;
+    uint256 public gmtPresalePrice;
+    uint256 public gmtListingPrice;
     uint256 public maxBusdAmount;
     uint256 public busdHardcap;
     uint256 public busdBasisPoints;
@@ -58,11 +59,12 @@ contract Treasury is ReentrancyGuard {
         router = _addresses[2];
         fund = _addresses[3];
 
-        gmtPrice = _values[0];
-        maxBusdAmount = _values[1];
-        busdHardcap = _values[2];
-        busdBasisPoints = _values[3];
-        unlockTime = _values[4];
+        gmtPresalePrice = _values[0];
+        gmtListingPrice = _values[1];
+        maxBusdAmount = _values[2];
+        busdHardcap = _values[3];
+        busdBasisPoints = _values[4];
+        unlockTime = _values[5];
     }
 
     function setGov(address _gov) external onlyGov nonReentrant {
@@ -116,7 +118,7 @@ contract Treasury is ReentrancyGuard {
         require(busdAfter.sub(busdBefore) == _busdAmount, "Treasury: invalid transfer");
 
         // send GMT
-        uint256 gmtAmount = _busdAmount.mul(PRECISION).div(gmtPrice);
+        uint256 gmtAmount = _busdAmount.mul(PRECISION).div(gmtPresalePrice);
         IERC20(gmt).transfer(account, gmtAmount);
     }
 
@@ -125,7 +127,7 @@ contract Treasury is ReentrancyGuard {
         isLiquidityAdded = true;
 
         uint256 busdAmount = busdReceived.mul(busdBasisPoints).div(BASIS_POINTS_DIVISOR);
-        uint256 gmtAmount = busdAmount.mul(PRECISION).div(gmtPrice);
+        uint256 gmtAmount = busdAmount.mul(PRECISION).div(gmtListingPrice);
 
         IERC20(busd).approve(router, busdAmount);
         IERC20(gmt).approve(router, gmtAmount);

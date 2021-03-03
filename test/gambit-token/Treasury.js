@@ -17,7 +17,8 @@ describe("Treasury", function () {
   let pair
   let router
 
-  let gmtPrice = 4.5 * PRECISION
+  let gmtPresalePrice = 4.5 * PRECISION
+  let gmtListingPrice = 5 * PRECISION
   let maxBusdAmount = expandDecimals(2000, 18)
   let busdHardcap = expandDecimals(900 * 1000, 18)
   let busdBasisPoints = 5000 // 50%
@@ -40,7 +41,8 @@ describe("Treasury", function () {
         fund.address
       ],
       [
-        gmtPrice,
+        gmtPresalePrice,
+        gmtListingPrice,
         maxBusdAmount,
         busdHardcap,
         busdBasisPoints,
@@ -64,7 +66,8 @@ describe("Treasury", function () {
         fund.address
       ],
       [
-        gmtPrice,
+        gmtPresalePrice,
+        gmtListingPrice,
         maxBusdAmount,
         busdHardcap,
         busdBasisPoints,
@@ -80,7 +83,8 @@ describe("Treasury", function () {
         fund.address
       ],
       [
-        gmtPrice,
+        gmtPresalePrice,
+        gmtListingPrice,
         maxBusdAmount,
         busdHardcap,
         busdBasisPoints,
@@ -95,7 +99,8 @@ describe("Treasury", function () {
     expect(await treasury.router()).eq(router.address)
     expect(await treasury.fund()).eq(fund.address)
 
-    expect(await treasury.gmtPrice()).eq(gmtPrice)
+    expect(await treasury.gmtPresalePrice()).eq(gmtPresalePrice)
+    expect(await treasury.gmtListingPrice()).eq(gmtListingPrice)
     expect(await treasury.maxBusdAmount()).eq(maxBusdAmount)
     expect(await treasury.busdHardcap()).eq(busdHardcap)
     expect(await treasury.busdBasisPoints()).eq(busdBasisPoints)
@@ -371,7 +376,7 @@ describe("Treasury", function () {
     expect(await busd.balanceOf(treasury.address)).eq(0)
     expect(await busd.balanceOf(pair.address)).eq(expandDecimals(750, 18))
     expect(await busd.balanceOf(fund.address)).eq(expandDecimals(250, 18))
-    expect(await gmt.balanceOf(pair.address)).eq("166666666666666666666") // ~166.666, 750 / 4.5
+    expect(await gmt.balanceOf(pair.address)).eq(expandDecimals(150, 18)) // ~150, 750 / 5
     expect(await gmt.balanceOf(fund.address)).eq(0)
 
     await expect(treasury.addLiquidity())
