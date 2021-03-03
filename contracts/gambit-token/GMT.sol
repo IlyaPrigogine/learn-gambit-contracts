@@ -4,8 +4,9 @@ pragma solidity 0.6.12;
 
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
+import "./interfaces/IGMT.sol";
 
-contract GMT is IERC20 {
+contract GMT is IERC20, IGMT {
     using SafeMath for uint256;
 
     string public constant name = "Gambit";
@@ -20,6 +21,8 @@ contract GMT is IERC20 {
 
     mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) public allowances;
+
+    mapping (address => bool) public admins;
 
     // only checked when hasActiveMigration is true
     // this can be used to block the AMM pair as a recipient
@@ -41,9 +44,19 @@ contract GMT is IERC20 {
         _;
     }
 
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "GMT: forbidden");
+        _;
+    }
+
     constructor(uint256 _initialSupply) public {
         gov = msg.sender;
+        admins[msg.sender] = true;
         _mint(msg.sender, _initialSupply);
+    }
+
+    function setGov(address _gov) external onlyGov {
+        gov = _gov;
     }
 
     function setNextMigrationTime(uint256 _migrationTime) external onlyGov {
@@ -51,12 +64,20 @@ contract GMT is IERC20 {
         migrationTime = _migrationTime;
     }
 
-    function beginMigration() external onlyGov {
+    function addAdmin(address _account) external onlyGov {
+        admins[_account] = true;
+    }
+
+    function removeAdmin(address _account) external onlyGov {
+        admins[_account] = false;
+    }
+
+    function beginMigration() external override onlyAdmin {
         require(block.timestamp > migrationTime, "GMT: migrationTime not yet passed");
         hasActiveMigration = true;
     }
 
-    function endMigration() external onlyGov {
+    function endMigration() external override onlyAdmin {
         hasActiveMigration = false;
     }
 

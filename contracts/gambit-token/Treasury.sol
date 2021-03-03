@@ -7,6 +7,7 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 
 import "../amm/interfaces/IPancakeRouter.sol";
+import "./interfaces/IGMT.sol";
 
 contract Treasury is ReentrancyGuard {
     using SafeMath for uint256;
@@ -16,6 +17,7 @@ contract Treasury is ReentrancyGuard {
 
     bool public isInitialized;
     bool public isSwapActive = true;
+    bool public isLiquidityAdded = false;
 
     address public gmt;
     address public busd;
@@ -63,6 +65,14 @@ contract Treasury is ReentrancyGuard {
         unlockTime = _values[4];
     }
 
+    function setGov(address _gov) external onlyGov nonReentrant {
+        gov = _gov;
+    }
+
+    function setFund(address _fund) external onlyGov nonReentrant {
+        fund = _fund;
+    }
+
     function extendUnlockTime(uint256 _unlockTime) external onlyGov nonReentrant {
         unlockTime = _unlockTime;
     }
@@ -93,27 +103,34 @@ contract Treasury is ReentrancyGuard {
         require(isSwapActive, "Treasury: swap is no longer active");
         require(_busdAmount > 0, "Treasury: invalid _busdAmount");
 
-        swapAmounts[account] = swapAmounts[account].add(_busdAmount);
-        require(swapAmounts[account] <= maxBusdAmount, "Treasury: maxBusdAmount exceeded");
-
         busdReceived = busdReceived.add(_busdAmount);
         require(busdReceived <= busdHardcap, "Treasury: busdHardcap exceeded");
 
-        uint256 gmtAmount = _busdAmount.mul(PRECISION).div(gmtPrice);
+        swapAmounts[account] = swapAmounts[account].add(_busdAmount);
+        require(swapAmounts[account] <= maxBusdAmount, "Treasury: maxBusdAmount exceeded");
+
         // receive BUSD
+        uint256 busdBefore = IERC20(busd).balanceOf(address(this));
         IERC20(busd).transferFrom(account, address(this), _busdAmount);
+        uint256 busdAfter = IERC20(busd).balanceOf(address(this));
+        require(busdAfter.sub(busdBefore) == _busdAmount, "Treasury: invalid transfer");
+
         // send GMT
-        IERC20(gmt).transferFrom(address(this), account, gmtAmount);
+        uint256 gmtAmount = _busdAmount.mul(PRECISION).div(gmtPrice);
+        IERC20(gmt).transfer(account, gmtAmount);
     }
 
     function addLiquidity() external onlyGov nonReentrant {
-        isSwapActive = false;
+        require(!isLiquidityAdded, "Treasury: liquidity already added");
+        isLiquidityAdded = true;
 
         uint256 busdAmount = busdReceived.mul(busdBasisPoints).div(BASIS_POINTS_DIVISOR);
-        uint256 gmtAmount = busdAmount.mul(gmtPrice).div(PRECISION);
+        uint256 gmtAmount = busdAmount.mul(PRECISION).div(gmtPrice);
 
         IERC20(busd).approve(router, busdAmount);
         IERC20(gmt).approve(router, gmtAmount);
+
+        IGMT(gmt).endMigration();
 
         IPancakeRouter(router).addLiquidity(
             busd, // tokenA
@@ -126,11 +143,13 @@ contract Treasury is ReentrancyGuard {
             block.timestamp // deadline
         );
 
+        IGMT(gmt).beginMigration();
+
         uint256 fundAmount = busdReceived.sub(busdAmount);
         IERC20(busd).transfer(fund, fundAmount);
     }
 
-    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov {
+    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov nonReentrant {
         require(block.timestamp > unlockTime, "Treasury: unlockTime not yet passed");
         IERC20(_token).transfer(_account, _amount);
     }
