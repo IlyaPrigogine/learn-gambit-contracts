@@ -4,8 +4,8 @@ const { expandDecimals } = require("../../test/shared/utilities")
 const PRECISION = 1000000
 
 async function main() {
-  const treasury = await contractAt("Treasury", "0xa00B112CE49d9d04631629Df5f87017255C2381D")
-  const gmt = await contractAt("GMT", "0xC2A6F2aFb618FC5e255A83943dD79faDC00bDCD4")
+  const treasury = await contractAt("Treasury", "0xa44E7252a0C137748F523F112644042E5987FfC7")
+  const gmt = await contractAt("GMT", "0x99e92123eB77Bc8f999316f622e5222498438784")
   const busd = await contractAt("Token", "0xe9e7cea3dedca5984780bafc599bd69add087d56")
   const router = { address: "0x05ff2b0db69458a0750badebc4f9e13add608c7f" }
   const fund = { address: "0x58CAaCa45a213e9218C5fFd605d5B953da9b9a91" }
