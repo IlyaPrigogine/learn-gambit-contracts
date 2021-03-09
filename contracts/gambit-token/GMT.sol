@@ -5,8 +5,9 @@ pragma solidity 0.6.12;
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
 import "./interfaces/IGMT.sol";
+import "../peripherals/interfaces/ITimelockTarget.sol";
 
-contract GMT is IERC20, IGMT {
+contract GMT is IERC20, IGMT, ITimelockTarget {
     using SafeMath for uint256;
 
     string public constant name = "Gambit";
@@ -55,7 +56,7 @@ contract GMT is IERC20, IGMT {
         _mint(msg.sender, _initialSupply);
     }
 
-    function setGov(address _gov) external onlyGov {
+    function setGov(address _gov) external override onlyGov {
         gov = _gov;
     }
 
@@ -98,7 +99,7 @@ contract GMT is IERC20, IGMT {
     }
 
     // to help users who accidentally send their tokens to this contract
-    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov {
+    function withdrawToken(address _token, address _account, uint256 _amount) external override onlyGov {
         IERC20(_token).transfer(_account, _amount);
     }
 

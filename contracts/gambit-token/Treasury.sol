@@ -8,8 +8,9 @@ import "../libraries/utils/ReentrancyGuard.sol";
 
 import "../amm/interfaces/IPancakeRouter.sol";
 import "./interfaces/IGMT.sol";
+import "../peripherals/interfaces/ITimelockTarget.sol";
 
-contract Treasury is ReentrancyGuard {
+contract Treasury is ReentrancyGuard, ITimelockTarget {
     using SafeMath for uint256;
 
     uint256 constant PRECISION = 1000000;
@@ -67,7 +68,7 @@ contract Treasury is ReentrancyGuard {
         unlockTime = _values[5];
     }
 
-    function setGov(address _gov) external onlyGov nonReentrant {
+    function setGov(address _gov) external override onlyGov nonReentrant {
         gov = _gov;
     }
 
@@ -152,7 +153,7 @@ contract Treasury is ReentrancyGuard {
         IERC20(busd).transfer(fund, fundAmount);
     }
 
-    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov nonReentrant {
+    function withdrawToken(address _token, address _account, uint256 _amount) external override onlyGov nonReentrant {
         require(block.timestamp > unlockTime, "Treasury: unlockTime not yet passed");
         IERC20(_token).transfer(_account, _amount);
     }
