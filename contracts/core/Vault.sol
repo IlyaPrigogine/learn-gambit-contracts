@@ -24,7 +24,7 @@ contract Vault is ReentrancyGuard {
     mapping (address => bool) public whitelistedTokens;
     mapping (address => address) public priceFeeds;
     mapping (address => uint256) public pricePrecisions;
-    mapping (address => uint256) public floorBasisPoints;
+    mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public tokenDecimals;
 
     mapping (address => uint256) public gusdAmounts;
@@ -73,9 +73,9 @@ contract Vault is ReentrancyGuard {
         uint256 pricePrecision = getPricePrecision(_token);
 
         uint256 tokenAmount = _gusdAmount.mul(pricePrecision).div(price);
-        uint256 floorAmount = getFloorAmount(_token, _gusdAmount);
-        if (tokenAmount > floorAmount) {
-            tokenAmount = floorAmount;
+        uint256 redemptionAmount = getRedemptionAmount(_token, _gusdAmount);
+        if (tokenAmount > redemptionAmount) {
+            tokenAmount = redemptionAmount;
         }
 
         gusdAmounts[_token] = gusdAmounts[_token].sub(_gusdAmount);
@@ -125,22 +125,22 @@ contract Vault is ReentrancyGuard {
         return precision;
     }
 
-    function getFloorBasisPoints(address _token) public view returns (uint256) {
-        uint256 basisPoints = floorBasisPoints[_token];
-        require(basisPoints > 0, "Vault: invalid floor basis points");
+    function getRedemptionBasisPoints(address _token) public view returns (uint256) {
+        uint256 basisPoints = redemptionBasisPoints[_token];
+        require(basisPoints > 0, "Vault: invalid redemption basis points");
         return basisPoints;
     }
 
-    function getFloorAmount(address _token, uint256 _gusdAmount) public view returns (uint256) {
+    function getRedemptionAmount(address _token, uint256 _gusdAmount) public view returns (uint256) {
         uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
-        uint256 basisPoints = getFloorBasisPoints(_token);
+        uint256 basisPoints = getRedemptionBasisPoints(_token);
         uint256 totalGusdAmount = gusdAmounts[_token];
         require(totalGusdAmount > 0, "Vault: invalid gusd amount");
 
-        uint256 floorAmount = _gusdAmount.mul(tokenBalance).div(totalGusdAmount);
-        floorAmount = floorAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 redemptionAmount = _gusdAmount.mul(tokenBalance).div(totalGusdAmount);
+        redemptionAmount = redemptionAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
 
-        return adjustForDecimals(floorAmount, gusd, _token);
+        return adjustForDecimals(redemptionAmount, gusd, _token);
     }
 
     function getSwapAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
