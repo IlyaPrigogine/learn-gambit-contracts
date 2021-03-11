@@ -25,6 +25,7 @@ contract Vault is ReentrancyGuard {
     mapping (address => address) public priceFeeds;
     mapping (address => uint256) public pricePrecisions;
     mapping (address => uint256) public floorBasisPoints;
+    mapping (address => uint256) public tokenDecimals;
 
     mapping (address => uint256) public gusdAmounts;
 
@@ -55,13 +56,11 @@ contract Vault is ReentrancyGuard {
         uint256 pricePrecision = getPricePrecision(_token);
 
         uint256 mintAmount = _tokenAmount.mul(price).div(pricePrecision);
+        mintAmount = adjustForDecimals(mintAmount, _token, gusd);
+
         gusdAmounts[_token] = gusdAmounts[_token].add(mintAmount);
 
-        uint256 tokenBefore = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(this), _tokenAmount);
-        uint256 tokenAfter = IERC20(_token).balanceOf(address(this));
-        require(tokenAfter.sub(tokenBefore) == _tokenAmount, "Vault: invalid transfer");
-
+        _transferIn(_token, _tokenAmount);
         IGUSD(gusd).mint(_receiver, mintAmount);
     }
 
@@ -83,6 +82,21 @@ contract Vault is ReentrancyGuard {
 
         IERC20(_token).safeTransfer(_receiver, tokenAmount);
         IGUSD(gusd).burn(msg.sender, _gusdAmount);
+    }
+
+    function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, address _receiver) external nonReentrant {
+        // TODO: validate that assets sent out do not exceed available amounts
+        require(_amountIn > 0, "Vault: invalid _amountIn");
+        require(whitelistedTokens[_tokenIn], "Vault: _tokenIn not whitelisted");
+        require(whitelistedTokens[_tokenOut], "Vault: _tokenOut not whitelisted");
+
+        uint256 amountOut = getSwapAmountOut(_tokenIn, _tokenOut, _amountIn);
+
+        gusdAmounts[_tokenIn] = gusdAmounts[_tokenIn].add(_amountIn);
+        gusdAmounts[_tokenOut] = gusdAmounts[_tokenOut].sub(amountOut);
+
+        _transferIn(_tokenIn, _amountIn);
+        IERC20(_tokenOut).safeTransfer(_receiver, amountOut);
     }
 
     function getMinPrice(address _token) public view returns (uint256) {
@@ -124,6 +138,31 @@ contract Vault is ReentrancyGuard {
         require(totalGusdAmount > 0, "Vault: invalid gusd amount");
 
         uint256 floorAmount = _gusdAmount.mul(tokenBalance).div(totalGusdAmount);
-        return floorAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
+        floorAmount = floorAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
+
+        return adjustForDecimals(floorAmount, gusd, _token);
+    }
+
+    function getSwapAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
+        uint256 priceIn = getMinPrice(_tokenIn);
+        uint256 precisionIn = getPricePrecision(_tokenIn);
+        uint256 priceOut = getMaxPrice(_tokenOut);
+        uint256 precisionOut = getPricePrecision(_tokenOut);
+
+        uint256 amount = _amountIn.mul(priceIn).mul(precisionOut).div(priceOut).div(precisionIn);
+        return adjustForDecimals(amount, _tokenIn, _tokenOut);
+    }
+
+    function adjustForDecimals(uint256 _amount, address _tokenDiv, address _tokenMul) public view returns (uint256) {
+        uint256 decimalsDiv = tokenDecimals[_tokenDiv];
+        uint256 decimalsMul = tokenDecimals[_tokenMul];
+        return _amount.mul(10 ** decimalsMul).div(10 ** decimalsDiv);
+    }
+
+    function _transferIn(address _token, uint256 _amount) private {
+        uint256 tokenBefore = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).safeTransfer(address(this), _amount);
+        uint256 tokenAfter = IERC20(_token).balanceOf(address(this));
+        require(tokenAfter.sub(tokenBefore) == _amount, "Vault: invalid transfer");
     }
 }
