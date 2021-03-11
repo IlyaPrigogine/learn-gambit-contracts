@@ -12,8 +12,8 @@ Install packages:
 
 ## Compile Contracts
 
-`npx buidler compile`
+`npx hardhat compile`
 
 ## Run Tests
 
-`npx buidler test`
+`npx hardhat test`
