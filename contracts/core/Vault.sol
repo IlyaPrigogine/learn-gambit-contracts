@@ -29,6 +29,7 @@ contract Vault is ReentrancyGuard {
     address public gusd;
     address public gov;
 
+    uint256 public liquidationFeeBasisPoints = 20; // 0.2%
     uint256 public maxLeverage = 500000; // 50x
 
     mapping (address => bool) public whitelistedTokens;
@@ -126,6 +127,16 @@ contract Vault is ReentrancyGuard {
         );
     }
 
+    function liquidateLong(address _account, address _token, address _feeReceiver) external nonReentrant {
+        require(shouldLiquidateLong(_account, _token), "Vault: long should not be liquidated");
+
+        Position memory position = longPositions[_account][_token];
+        uint256 liquidationFee = usdToTokenMin(_token, position.size).mul(liquidationFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+
+        _closeLongPosition(_account, _token);
+        _transferOut(_token, liquidationFee, _feeReceiver);
+    }
+
     function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, address _receiver) external nonReentrant {
         require(_amountIn > 0, "Vault: invalid _amountIn");
         require(whitelistedTokens[_tokenIn], "Vault: _tokenIn not whitelisted");
@@ -215,6 +226,25 @@ contract Vault is ReentrancyGuard {
         return _usdAmount.div(price);
     }
 
+    function shouldLiquidateLong(address _account, address _token) public view returns (bool) {
+        Position memory position = longPositions[_account][_token];
+        if (position.size == 0) { return false; }
+
+        (bool priceIncreased, uint256 delta) = getPositionDelta(_account, _token);
+        if (priceIncreased) { return false; }
+
+        return delta >= position.size;
+    }
+
+    function getPositionDelta(address _account, address _token) public view returns (bool, uint256) {
+        Position memory position = longPositions[_account][_token];
+        uint256 currentPrice = getMinPrice(_token);
+        bool priceIncreased = currentPrice > position.entryPrice;
+        uint256 priceDelta = priceIncreased ? currentPrice.sub(position.entryPrice) : position.entryPrice.sub(currentPrice);
+        uint256 delta = position.size.mul(priceDelta).mul(position.leverage).div(position.entryPrice).div(BASIS_POINTS_DIVISOR).div(BASIS_POINTS_DIVISOR);
+        return (priceIncreased, delta);
+    }
+
     function _transferIn(address _token, uint256 _amount) private {
         uint256 tokenBefore = IERC20(_token).balanceOf(address(this));
         IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
@@ -250,12 +280,9 @@ contract Vault is ReentrancyGuard {
         position.size = 0;
         position.reservedAmount = 0;
 
-        uint256 currentPrice = getMinPrice(_token);
-        bool hasProfit = currentPrice > position.entryPrice;
-        uint256 priceDelta = hasProfit ? currentPrice.sub(position.entryPrice) : position.entryPrice.sub(currentPrice);
-        uint256 delta = position.size.mul(priceDelta).mul(position.leverage).div(position.entryPrice).div(BASIS_POINTS_DIVISOR).div(BASIS_POINTS_DIVISOR);
+        (bool priceIncreased, uint256 delta) = getPositionDelta(_account, _token);
 
-        if (hasProfit) {
+        if (priceIncreased) {
             uint256 newSize = position.size.add(delta);
             return usdToTokenMin(_token, newSize);
         }
