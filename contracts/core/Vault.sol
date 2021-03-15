@@ -42,7 +42,8 @@ contract Vault is ReentrancyGuard {
     mapping (address => uint256) public gusdAmounts;
     mapping (address => uint256) public reservedAmounts;
 
-    mapping (address => mapping (address => Position)) public longPositions;
+    mapping (bytes32 => Position) public longPositions;
+    mapping (bytes32 => Position) public shortPositions;
 
     modifier onlyGov() {
         require(msg.sender == gov, "GUSD: forbidden");
@@ -101,7 +102,6 @@ contract Vault is ReentrancyGuard {
     function updateLong(address _token, uint256 _collateralAmount, uint256 _leverage) external nonReentrant {
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
         require(!stableTokens[_token], "Vault: _token must not be a stableToken");
-        require(_leverage > 0, "Vault: invalid _leverage");
         require(_leverage > MIN_LEVERAGE, "Vault: _leverage must be more than MIN_LEVERAGE");
         require(_leverage <= maxLeverage, "Vault: max leverage exceeded");
 
@@ -119,9 +119,43 @@ contract Vault is ReentrancyGuard {
         uint256 borrowAmount = _collateralAmount.mul(_leverage).div(BASIS_POINTS_DIVISOR);
         _increaseReservedAmount(_token, borrowAmount);
 
-        longPositions[msg.sender][_token] = Position(
+        bytes32 key = getLongPositionKey(msg.sender, _token);
+        longPositions[key] = Position(
             tokenToUsdMin(_token, _collateralAmount),
             getMaxPrice(_token),
+            _leverage,
+            borrowAmount
+        );
+    }
+
+    function updateShort(address _collateralToken, address _indexToken, uint256 _collateralAmount, uint256 _leverage) external nonReentrant {
+        require(whitelistedTokens[_collateralToken], "Vault: _collateralToken not whitelisted");
+        require(stableTokens[_collateralToken], "Vault: _collateralToken must be a stableToken");
+        require(_leverage > MIN_LEVERAGE, "Vault: _leverage must be more than MIN_LEVERAGE");
+        require(_leverage <= maxLeverage, "Vault: max leverage exceeded");
+
+        // _indexToken is intentionally not enforced to be a whitelisted token
+        // it just needs to have a valid priceFeed
+        // this adds flexbility by allowing shorting on non-whitelisted tokens
+
+        uint256 existingCollateral = _closeShortPosition(msg.sender, _collateralToken, _indexToken);
+        if (existingCollateral > _collateralAmount) {
+            _transferOut(_collateralToken, existingCollateral.sub(_collateralAmount), msg.sender);
+        }
+
+        if (_collateralAmount == 0) { return; }
+
+        if (_collateralAmount > existingCollateral) {
+            _transferIn(_collateralToken, _collateralAmount.sub(existingCollateral));
+        }
+
+        uint256 borrowAmount = _collateralAmount.mul(_leverage).div(BASIS_POINTS_DIVISOR);
+        _increaseReservedAmount(_collateralToken, borrowAmount);
+
+        bytes32 key = getShortPositionKey(msg.sender, _collateralToken, _indexToken);
+        shortPositions[key] = Position(
+            tokenToUsdMin(_collateralToken, _collateralAmount),
+            getMaxPrice(_indexToken),
             _leverage,
             borrowAmount
         );
@@ -130,11 +164,23 @@ contract Vault is ReentrancyGuard {
     function liquidateLong(address _account, address _token, address _feeReceiver) external nonReentrant {
         require(shouldLiquidateLong(_account, _token), "Vault: long should not be liquidated");
 
-        Position memory position = longPositions[_account][_token];
+        bytes32 key = getLongPositionKey(_account, _token);
+        Position memory position = longPositions[key];
         uint256 liquidationFee = usdToTokenMin(_token, position.size).mul(liquidationFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
 
         _closeLongPosition(_account, _token);
         _transferOut(_token, liquidationFee, _feeReceiver);
+    }
+
+    function liquidateShort(address _account, address _collateralToken, address _indexToken, address _feeReceiver) external nonReentrant {
+        require(shouldLiquidateShort(_account, _collateralToken, _indexToken), "Vault: short should not be liquidated");
+
+        bytes32 key = getShortPositionKey(_account, _collateralToken, _indexToken);
+        Position memory position = shortPositions[key];
+        uint256 liquidationFee = usdToTokenMin(_collateralToken, position.size).mul(liquidationFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+
+        _closeShortPosition(_account, _collateralToken, _indexToken);
+        _transferOut(_collateralToken, liquidationFee, _feeReceiver);
     }
 
     function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, address _receiver) external nonReentrant {
@@ -227,22 +273,60 @@ contract Vault is ReentrancyGuard {
     }
 
     function shouldLiquidateLong(address _account, address _token) public view returns (bool) {
-        Position memory position = longPositions[_account][_token];
+        bytes32 key = getLongPositionKey(_account, _token);
+        Position memory position = longPositions[key];
         if (position.size == 0) { return false; }
 
-        (bool priceIncreased, uint256 delta) = getPositionDelta(_account, _token);
-        if (priceIncreased) { return false; }
+        (bool hasProfit, uint256 delta) = getLongPositionDelta(_account, _token);
+        if (hasProfit) { return false; }
 
         return delta >= position.size;
     }
 
-    function getPositionDelta(address _account, address _token) public view returns (bool, uint256) {
-        Position memory position = longPositions[_account][_token];
+    function shouldLiquidateShort(address _account, address _collateralToken, address _indexToken) public view returns (bool) {
+        bytes32 key = getShortPositionKey(_account, _collateralToken, _indexToken);
+        Position memory position = longPositions[key];
+        if (position.size == 0) { return false; }
+
+        (bool hasProfit, uint256 delta) = getShortPositionDelta(_account, _collateralToken, _indexToken);
+        if (hasProfit) { return false; }
+
+        return delta >= position.size;
+    }
+
+    function getLongPositionDelta(address _account, address _token) public view returns (bool, uint256) {
+        bytes32 key = getLongPositionKey(_account, _token);
+        Position memory position = longPositions[key];
         uint256 currentPrice = getMinPrice(_token);
         bool priceIncreased = currentPrice > position.entryPrice;
         uint256 priceDelta = priceIncreased ? currentPrice.sub(position.entryPrice) : position.entryPrice.sub(currentPrice);
         uint256 delta = position.size.mul(priceDelta).mul(position.leverage).div(position.entryPrice).div(BASIS_POINTS_DIVISOR).div(BASIS_POINTS_DIVISOR);
         return (priceIncreased, delta);
+    }
+
+    function getShortPositionDelta(address _account, address _collateralToken, address _indexToken) public view returns (bool, uint256) {
+        bytes32 key = getShortPositionKey(_account, _collateralToken, _indexToken);
+        Position memory position = shortPositions[key];
+        uint256 currentPrice = getMaxPrice(_indexToken);
+        bool priceIncreased = currentPrice > position.entryPrice;
+        uint256 priceDelta = priceIncreased ? currentPrice.sub(position.entryPrice) : position.entryPrice.sub(currentPrice);
+        uint256 delta = position.size.mul(priceDelta).mul(position.leverage).div(position.entryPrice).div(BASIS_POINTS_DIVISOR).div(BASIS_POINTS_DIVISOR);
+        return (!priceIncreased, delta);
+    }
+
+    function getLongPositionKey(address _account, address _token) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(
+            _account,
+            _token
+        ));
+    }
+
+    function getShortPositionKey(address _account, address _collateralToken, address _indexToken) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(
+            _account,
+            _collateralToken,
+            _indexToken
+        ));
     }
 
     function _transferIn(address _token, uint256 _amount) private {
@@ -271,7 +355,8 @@ contract Vault is ReentrancyGuard {
     }
 
     function _closeLongPosition(address _account, address _token) private returns (uint256) {
-        Position storage position = longPositions[_account][_token];
+        bytes32 key = getLongPositionKey(_account, _token);
+        Position storage position = longPositions[key];
         if (position.size == 0) {
             return 0;
         }
@@ -280,9 +365,9 @@ contract Vault is ReentrancyGuard {
         position.size = 0;
         position.reservedAmount = 0;
 
-        (bool priceIncreased, uint256 delta) = getPositionDelta(_account, _token);
+        (bool hasProfit, uint256 delta) = getLongPositionDelta(_account, _token);
 
-        if (priceIncreased) {
+        if (hasProfit) {
             uint256 newSize = position.size.add(delta);
             return usdToTokenMin(_token, newSize);
         }
@@ -293,5 +378,31 @@ contract Vault is ReentrancyGuard {
 
         uint256 newSize = position.size.sub(delta);
         return usdToTokenMin(_token, newSize);
+    }
+
+    function _closeShortPosition(address _account, address _collateralToken, address _indexToken) private returns (uint256) {
+        bytes32 key = getShortPositionKey(_account, _collateralToken, _indexToken);
+        Position storage position = shortPositions[key];
+        if (position.size == 0) {
+            return 0;
+        }
+
+        reservedAmounts[_collateralToken] = reservedAmounts[_collateralToken].sub(position.reservedAmount);
+        position.size = 0;
+        position.reservedAmount = 0;
+
+        (bool hasProfit, uint256 delta) = getShortPositionDelta(_account, _collateralToken, _indexToken);
+
+        if (hasProfit) {
+            uint256 newSize = position.size.add(delta);
+            return usdToTokenMin(_collateralToken, newSize);
+        }
+
+        if (delta >= position.size) {
+            return 0; // user's position has been liquidated
+        }
+
+        uint256 newSize = position.size.sub(delta);
+        return usdToTokenMin(_collateralToken, newSize);
     }
 }
