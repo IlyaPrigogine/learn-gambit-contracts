@@ -16,7 +16,6 @@ contract Vault is ReentrancyGuard {
 
     struct Position {
         uint256 size;
-        uint256 qty;
         uint256 collateral;
         uint256 averagePrice;
         uint256 entryFundingRate;
@@ -117,57 +116,96 @@ contract Vault is ReentrancyGuard {
         _transferOut(_token, amountAfterFees, _receiver);
     }
 
-    function updatePosition(address _collateralToken, address _indexToken, uint256 _collateral, uint256 _size, bool _isLong) external nonReentrant {
-        _validatePositionTokens(_collateralToken, _indexToken, _isLong);
+    function increasePosition(address _collateralToken, address _indexToken, uint256 _collateral, uint256 _size, bool _isLong) external nonReentrant {
+        require(_size > 0, "Vault: invalid _size");
+        _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
 
         bytes32 key = getPositionKey(msg.sender, _collateralToken, _indexToken, _isLong);
         Position storage position = positions[key];
 
-        require(position.size != _size, "Vault: position is unchanged");
-
-        bool isBuying = _size > position.size;
-        uint256 sizeDelta = isBuying ? _size.sub(position.size) : position.size.sub(_size);
         uint256 price = _isLong ? getMaxPrice(_indexToken) : getMinPrice(_indexToken);
 
-        uint256 qtyDelta = sizeDelta.div(price);
-        position.qty = isBuying ? position.qty.add(qtyDelta) : position.qty.sub(qtyDelta);
-        position.averagePrice = _size.div(position.qty);
-        position.size = _size;
-        position.entryFundingRate = cumulativeFundingRates[_collateralToken];
+        if (position.averagePrice == 0) {
+            position.averagePrice = price;
+        } else {
+            uint256 qtyDelta = _size.div(price);
+            uint256 qty = position.size.div(position.averagePrice).add(qtyDelta);
+            position.averagePrice = _size.div(qty);
+        }
 
-        // TODO: handle PnL, funding rate and fees
-        updateCollateral(_collateralToken, _indexToken, _collateral, _isLong);
+        uint256 fee = _collectMarginFees(_collateralToken, _size, position.size, position.entryFundingRate);
+
+        uint256 collateral = position.collateral;
+        if (_collateral > 0) {
+            _transferIn(_collateralToken, usdToTokenMax(_collateralToken, _collateral));
+            collateral = collateral.add(_collateral);
+        }
+
+        position.collateral = collateral.sub(fee);
+        position.entryFundingRate = cumulativeFundingRates[_collateralToken];
+        position.size = position.size.add(_size);
+
+        (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
+        if (!hasProfit) {
+            require(delta < _collateral, "Vault: position should be liquidated");
+        }
+
+        _increaseReservedAmount(_indexToken, usdToTokenMax(_indexToken, _size));
+
+        uint256 remainingCollateral = hasProfit ? position.collateral.add(delta) : position.collateral.sub(delta);
+        require(position.size.div(remainingCollateral).mul(BASIS_POINTS_DIVISOR) <= maxLeverage, "Vault: maxLeverage exceeded");
+        require(position.collateral > getLiquidationFee(_collateralToken), "Vault: insufficient collateral");
     }
 
-    function updateCollateral(address _collateralToken, address _indexToken, uint256 _collateral, bool _isLong) public nonReentrant {
-        _validatePositionTokens(_collateralToken, _indexToken, _isLong);
+    function decreasePosition(address _collateralToken, address _indexToken, uint256 _collateral, uint256 _size, bool _isLong) external nonReentrant {
+        require(_size > 0, "Vault: invalid _size");
+        _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
 
         bytes32 key = getPositionKey(msg.sender, _collateralToken, _indexToken, _isLong);
         Position storage position = positions[key];
+        require(position.size > 0, "Vault: empty position");
 
-        if (position.collateral == _collateral) {
-            return;
+        uint256 fee = _collectMarginFees(_collateralToken, _size, position.size, position.entryFundingRate);
+
+        (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
+        uint256 amountOut = _collateral;
+
+        if (hasProfit) {
+            amountOut = _size.mul(delta).div(position.size);
         }
 
-        if (_collateral > position.collateral) {
-            uint256 delta = _collateral.sub(position.collateral);
-            _transferIn(_collateralToken, usdToTokenMax(_collateralToken, delta));
-        } else {
-            uint256 delta = position.collateral.sub(_collateral);
-            _transferOut(_collateralToken, usdToTokenMin(_collateralToken, delta), msg.sender);
+        if (_collateral > 0) {
+            position.collateral = position.collateral.sub(_collateral);
         }
 
-        position.collateral = _collateral;
+        position.collateral = position.collateral.sub(fee);
+        position.entryFundingRate = cumulativeFundingRates[_collateralToken];
+        position.size = position.size.sub(_size);
 
-        // TODO: validate collateral amount, leverage
+        _decreaseReservedAmount(_indexToken, usdToTokenMin(_indexToken, _size));
+
+        if (position.size > 0) {
+            uint256 remainingCollateral = hasProfit ? position.collateral.add(delta) : position.collateral.sub(delta);
+            require(position.size.div(remainingCollateral).mul(BASIS_POINTS_DIVISOR) <= maxLeverage, "Vault: maxLeverage exceeded");
+            require(position.collateral > getLiquidationFee(_collateralToken), "Vault: insufficient collateral");
+        }
+
+        if (amountOut > 0) {
+            _transferOut(_collateralToken, amountOut, msg.sender);
+        }
     }
 
+    function liquidatePosition(address _account, address _collateralToken, address _indexToken, bool _isLong, address _feeReceiver) public {
+        _validateTokens(_collateralToken, _indexToken, _isLong);
+        updateCumulativeFundingRate(_collateralToken);
+        _liquidatePosition(_account, _collateralToken, _indexToken, _isLong, _feeReceiver);
+    }
 
     function getLiquidationFee(address _token) public view returns (uint256) {
         uint256 pricePrecision = getPricePrecision(_token);
-        return usdToTokenMin(_token, liquidationFeeUsd.mul(pricePrecision));
+        return liquidationFeeUsd.mul(pricePrecision);
     }
 
     function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, address _receiver) external nonReentrant {
@@ -295,14 +333,74 @@ contract Vault is ReentrancyGuard {
         return fundingRateFactor.mul(reservedAmounts[_token]).mul(intervals).div(balance);
     }
 
-    // _indexToken is intentionally not enforced to be a whitelisted token for shorts
-    // it just needs to have a valid priceFeed
-    // this adds flexbility by allowing shorting on non-whitelisted tokens
-    function _validatePositionTokens(address _collateralToken, address _indexToken, bool _isLong) private view {
-        require(whitelistedTokens[_collateralToken], "Vault: _collateralToken not whitelisted");
+    function getDelta(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong) public view returns (bool, uint256) {
+        uint256 price = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
+        uint256 priceDelta = _averagePrice > price ? _averagePrice.sub(price) : price.sub(_averagePrice);
+        uint256 sizeDelta = _size.mul(priceDelta).div(_averagePrice);
+
+        if (_isLong) {
+            bool hasProfit = price > _averagePrice;
+            return (hasProfit, sizeDelta);
+        }
+
+        bool hasProfit = _averagePrice > price;
+        return (hasProfit, sizeDelta);
+    }
+
+    function getFundingFee(address _token, uint256 _positionSize, uint256 _entryFundingRate) public view returns (uint256) {
+        if (_positionSize == 0) { return 0; }
+
+        uint256 fundingRate = cumulativeFundingRates[_token].sub(_entryFundingRate);
+        if (fundingRate == 0) { return 0; }
+
+        uint256 fundingFee = _positionSize.mul(fundingRate).div(FUNDING_RATE_PRECISION);
+        return fundingFee;
+    }
+
+    function _liquidatePosition(address _account, address _collateralToken, address _indexToken, bool _isLong, address _feeReceiver) public {
+        bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
+        Position storage position = positions[key];
+        if (position.size == 0) { return; }
+
+        (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
+        uint256 fundingFee = getFundingFee(_collateralToken, position.size, position.entryFundingRate);
+
+        if (hasProfit && position.collateral.add(delta) > fundingFee) {
+            return;
+        }
+
+        if (!hasProfit && position.collateral > delta.add(fundingFee)) {
+            return;
+        }
+
+        if (fundingFee > position.collateral) {
+            fundingFee = position.collateral;
+        }
+
+        _decreaseReservedAmount(_indexToken, position.size.div(position.averagePrice));
+
+        uint256 liquidationFee = getLiquidationFee(_collateralToken);
+        _transferOut(_collateralToken, usdToTokenMin(_collateralToken, liquidationFee), _feeReceiver);
+
+        feeReserves[_collateralToken] = feeReserves[_collateralToken].add(usdToTokenMin(_collateralToken, fundingFee));
+
+        delete positions[key];
+    }
+
+    function _validateTokens(address _collateralToken, address _indexToken, bool _isLong) private view {
         if (_isLong) {
             require(_collateralToken == _indexToken, "Vault: mismatched tokens");
+            require(whitelistedTokens[_collateralToken], "Vault: _collateralToken not whitelisted");
+            require(!stableTokens[_collateralToken], "Vault: _collateralToken must not be a stableToken");
+            return;
         }
+
+        // _indexToken is intentionally not enforced to be a whitelisted token for shorts
+        // it just needs to have a valid priceFeed
+        // this adds flexbility by allowing shorting on non-whitelisted tokens
+        require(whitelistedTokens[_collateralToken], "Vault: _collateralToken not whitelisted");
+        require(stableTokens[_collateralToken], "Vault: _collateralToken must be a stableToken");
+        require(!stableTokens[_indexToken], "Vault: _indexToken must not be a stableToken");
     }
 
     function _collectSwapFees(address _token, uint256 _amount) private returns (uint256) {
@@ -311,10 +409,15 @@ contract Vault is ReentrancyGuard {
         return _amount.sub(feeAmount);
     }
 
-    function _collectMarginFees(address _token, uint256 _amount, uint256 _leverage) private returns (uint256) {
-        uint256 feeAmount = _amount.mul(marginFeeBasisPoints).mul(_leverage).div(BASIS_POINTS_DIVISOR).div(BASIS_POINTS_DIVISOR);
-        feeReserves[_token] = feeReserves[_token].add(feeAmount);
-        return _amount.sub(feeAmount);
+    function _collectMarginFees(address _token, uint256 _size, uint256 _positionSize, uint256 _entryFundingRate) private returns (uint256) {
+        uint256 feeUsd = _size.mul(marginFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 fundingFee = getFundingFee(_token, _positionSize, _entryFundingRate);
+        feeUsd = feeUsd.add(fundingFee);
+
+        uint256 feeTokens = usdToTokenMax(_token, feeUsd);
+        feeReserves[_token] = feeReserves[_token].add(feeTokens);
+
+        return feeUsd;
     }
 
     function _transferIn(address _token, uint256 _amount) private {
@@ -337,8 +440,7 @@ contract Vault is ReentrancyGuard {
         require(reservedAmounts[_token] <= balance, "Vault: insufficient reserve");
     }
 
-    function _validateReserveAmount(address _token) private view {
-        uint256 balance = IERC20(_token).balanceOf(address(this));
-        require(reservedAmounts[_token] <= balance, "Vault: reserve limit exceeded");
+    function _decreaseReservedAmount(address _token, uint256 _amount) private {
+        reservedAmounts[_token] = reservedAmounts[_token].sub(_amount);
     }
 }
