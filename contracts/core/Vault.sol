@@ -31,7 +31,7 @@ contract Vault is ReentrancyGuard {
     address public gusd;
     address public gov;
 
-    uint256 public liquidationFeeBasisPoints = 20; // 0.2%
+    uint256 public liquidationFeeUsd = 5; // 5 USD
     uint256 public maxLeverage = 500000; // 50x
 
     // with the default settings, the funding rate will be 0.3% * utilisation ratio
@@ -40,6 +40,9 @@ contract Vault is ReentrancyGuard {
     uint256 public fundingInterval = 8 hours;
     uint256 public fundingRateFactor = 3000;
     uint256 public lastFundingTime;
+
+    uint256 public swapFeeBasisPoints = 20; // 0.2%
+    uint256 public marginFeeBasisPoints = 2; // 0.02%
 
     mapping (address => bool) public whitelistedTokens;
     mapping (address => bool) public stableTokens;
@@ -83,7 +86,8 @@ contract Vault is ReentrancyGuard {
         uint256 price = getMinPrice(_token);
         uint256 pricePrecision = getPricePrecision(_token);
 
-        uint256 mintAmount = _tokenAmount.mul(price).div(pricePrecision);
+        uint256 amountAfterFees = _collectSwapFees(_token, _tokenAmount);
+        uint256 mintAmount = amountAfterFees.mul(price).div(pricePrecision);
         mintAmount = adjustForDecimals(mintAmount, _token, gusd);
 
         gusdAmounts[_token] = gusdAmounts[_token].add(mintAmount);
@@ -106,10 +110,12 @@ contract Vault is ReentrancyGuard {
             tokenAmount = redemptionAmount;
         }
 
+        uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
+
         gusdAmounts[_token] = gusdAmounts[_token].sub(_gusdAmount);
 
         IGUSD(gusd).burn(msg.sender, _gusdAmount);
-        _transferOut(_token, tokenAmount, _receiver);
+        _transferOut(_token, amountAfterFees, _receiver);
     }
 
     function updateLong(address _token, uint256 _collateralAmount, uint256 _leverage) external nonReentrant {
@@ -117,11 +123,15 @@ contract Vault is ReentrancyGuard {
         require(!stableTokens[_token], "Vault: _token must not be a stableToken");
         require(_leverage > MIN_LEVERAGE, "Vault: _leverage must be more than MIN_LEVERAGE");
         require(_leverage <= maxLeverage, "Vault: max leverage exceeded");
+
         updateCumulativeFundingRate(_token);
 
+        bytes32 key = getLongPositionKey(msg.sender, _token);
         uint256 existingCollateral = _closeLongPosition(msg.sender, _token);
+
         if (existingCollateral > _collateralAmount) {
-            _transferOut(_token, existingCollateral.sub(_collateralAmount), msg.sender);
+            uint256 amountOut = _collectMarginFees(_token, existingCollateral.sub(_collateralAmount), longPositions[key].leverage);
+            _transferOut(_token, amountOut, msg.sender);
         }
 
         if (_collateralAmount == 0) { return; }
@@ -130,12 +140,21 @@ contract Vault is ReentrancyGuard {
             _transferIn(_token, _collateralAmount.sub(existingCollateral));
         }
 
-        uint256 borrowAmount = _collateralAmount.mul(_leverage).div(BASIS_POINTS_DIVISOR);
+        uint256 amountAfterFees = _collectMarginFees(_token, _collateralAmount, _leverage);
+
+        // if a position remains active, the collateral amount must be more than the
+        // liquidation fee to ensure that the network fee of liquidating the position
+        // is covered
+        uint256 usdAmount = tokenToUsdMin(_token, amountAfterFees);
+        require(usdAmount >= getLiquidationFee(_token));
+
+        uint256 borrowAmount = amountAfterFees.mul(_leverage).div(BASIS_POINTS_DIVISOR);
         _increaseReservedAmount(_token, borrowAmount);
 
-        bytes32 key = getLongPositionKey(msg.sender, _token);
+        // store the position's size in USD as the profits / losses should be calculated
+        // based on the USD value
         longPositions[key] = Position(
-            tokenToUsdMin(_token, _collateralAmount),
+            usdAmount,
             getMaxPrice(_token),
             _leverage,
             borrowAmount,
@@ -143,20 +162,23 @@ contract Vault is ReentrancyGuard {
         );
     }
 
+    // _indexToken is intentionally not enforced to be a whitelisted token
+    // it just needs to have a valid priceFeed
+    // this adds flexbility by allowing shorting on non-whitelisted tokens
     function updateShort(address _collateralToken, address _indexToken, uint256 _collateralAmount, uint256 _leverage) external nonReentrant {
         require(whitelistedTokens[_collateralToken], "Vault: _collateralToken not whitelisted");
         require(stableTokens[_collateralToken], "Vault: _collateralToken must be a stableToken");
         require(_leverage > MIN_LEVERAGE, "Vault: _leverage must be more than MIN_LEVERAGE");
         require(_leverage <= maxLeverage, "Vault: max leverage exceeded");
+
         updateCumulativeFundingRate(_collateralToken);
 
-        // _indexToken is intentionally not enforced to be a whitelisted token
-        // it just needs to have a valid priceFeed
-        // this adds flexbility by allowing shorting on non-whitelisted tokens
-
+        bytes32 key = getShortPositionKey(msg.sender, _collateralToken, _indexToken);
         uint256 existingCollateral = _closeShortPosition(msg.sender, _collateralToken, _indexToken);
+
         if (existingCollateral > _collateralAmount) {
-            _transferOut(_collateralToken, existingCollateral.sub(_collateralAmount), msg.sender);
+            uint256 amountOut = _collectMarginFees(_collateralToken, existingCollateral.sub(_collateralAmount), shortPositions[key].leverage);
+            _transferOut(_collateralToken, amountOut, msg.sender);
         }
 
         if (_collateralAmount == 0) { return; }
@@ -165,12 +187,21 @@ contract Vault is ReentrancyGuard {
             _transferIn(_collateralToken, _collateralAmount.sub(existingCollateral));
         }
 
-        uint256 borrowAmount = _collateralAmount.mul(_leverage).div(BASIS_POINTS_DIVISOR);
+        uint256 amountAfterFees = _collectMarginFees(_collateralToken, _collateralAmount, _leverage);
+
+        // if a position remains active, the collateral amount must be more than the
+        // liquidation fee to ensure that the network fee of liquidating the position
+        // is covered
+        uint256 usdAmount = tokenToUsdMin(_collateralToken, amountAfterFees);
+        require(usdAmount >= getLiquidationFee(_collateralToken));
+
+        uint256 borrowAmount = amountAfterFees.mul(_leverage).div(BASIS_POINTS_DIVISOR);
         _increaseReservedAmount(_collateralToken, borrowAmount);
 
-        bytes32 key = getShortPositionKey(msg.sender, _collateralToken, _indexToken);
+        // store the position's size in USD as the profits / losses should be calculated
+        // based on the USD value
         shortPositions[key] = Position(
-            tokenToUsdMin(_collateralToken, _collateralAmount),
+            usdAmount,
             getMaxPrice(_indexToken),
             _leverage,
             borrowAmount,
@@ -182,24 +213,25 @@ contract Vault is ReentrancyGuard {
         updateCumulativeFundingRate(_token);
         require(shouldLiquidateLong(_account, _token), "Vault: long should not be liquidated");
 
-        bytes32 key = getLongPositionKey(_account, _token);
-        Position memory position = longPositions[key];
-        uint256 liquidationFee = usdToTokenMin(_token, position.size).mul(liquidationFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
-
         _closeLongPosition(_account, _token);
-        _transferOut(_token, liquidationFee, _feeReceiver);
+
+        uint256 feeAmount = getLiquidationFee(_token);
+        _transferOut(_token, feeAmount, _feeReceiver);
     }
 
     function liquidateShort(address _account, address _collateralToken, address _indexToken, address _feeReceiver) external nonReentrant {
         updateCumulativeFundingRate(_collateralToken);
         require(shouldLiquidateShort(_account, _collateralToken, _indexToken), "Vault: short should not be liquidated");
 
-        bytes32 key = getShortPositionKey(_account, _collateralToken, _indexToken);
-        Position memory position = shortPositions[key];
-        uint256 liquidationFee = usdToTokenMin(_collateralToken, position.size).mul(liquidationFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
-
         _closeShortPosition(_account, _collateralToken, _indexToken);
-        _transferOut(_collateralToken, liquidationFee, _feeReceiver);
+
+        uint256 feeAmount = getLiquidationFee(_collateralToken);
+        _transferOut(_collateralToken, feeAmount, _feeReceiver);
+    }
+
+    function getLiquidationFee(address _token) public view returns (uint256) {
+        uint256 pricePrecision = getPricePrecision(_token);
+        return usdToTokenMin(_token, liquidationFeeUsd.mul(pricePrecision));
     }
 
     function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, address _receiver) external nonReentrant {
@@ -380,6 +412,18 @@ contract Vault is ReentrancyGuard {
         uint256 fundingRate = getNextFundingRate(_token);
         cumulativeFundingRates[_token] = cumulativeFundingRates[_token].add(fundingRate);
         lastFundingTime = block.timestamp.div(fundingInterval).mul(fundingInterval);
+    }
+
+    function _collectSwapFees(address _token, uint256 _amount) private returns (uint256) {
+        uint256 feeAmount = _amount.mul(swapFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+        feeReserves[_token] = feeReserves[_token].add(feeAmount);
+        return _amount.sub(feeAmount);
+    }
+
+    function _collectMarginFees(address _token, uint256 _amount, uint256 _leverage) private returns (uint256) {
+        uint256 feeAmount = _amount.mul(marginFeeBasisPoints).mul(_leverage).div(BASIS_POINTS_DIVISOR).div(BASIS_POINTS_DIVISOR);
+        feeReserves[_token] = feeReserves[_token].add(feeAmount);
+        return _amount.sub(feeAmount);
     }
 
     function _transferIn(address _token, uint256 _amount) private {
