@@ -47,7 +47,7 @@ contract Vault is ReentrancyGuard {
 
     mapping (address => bool) public whitelistedTokens;
     mapping (address => address) public priceFeeds;
-    mapping (address => uint256) public pricePrecisions;
+    mapping (address => uint256) public priceDecimals;
     mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public tokenDecimals;
     mapping (address => bool) public stableTokens;
@@ -93,18 +93,18 @@ contract Vault is ReentrancyGuard {
     function addWhitelistedToken(
         address _token,
         address _priceFeed,
-        uint256 _precision,
+        uint256 _priceDecimals,
         uint256 _redemptionBps,
-        uint256 _decimals,
+        uint256 _tokenDecimals,
         bool _isStable
     ) external nonReentrant onlyGov afterGovUnlockTime {
         require(!whitelistedTokens[_token], "Vault: token already whitelisted");
 
         whitelistedTokens[_token] = true;
         priceFeeds[_token] = _priceFeed;
-        pricePrecisions[_token] = _precision;
+        priceDecimals[_token] = _priceDecimals;
         redemptionBasisPoints[_token] = _redemptionBps;
-        tokenDecimals[_token] = _decimals;
+        tokenDecimals[_token] = _tokenDecimals;
         stableTokens[_token] = _isStable;
 
         // validate price feed
@@ -115,7 +115,7 @@ contract Vault is ReentrancyGuard {
         require(whitelistedTokens[_token], "Vault: token not whitelisted");
         delete whitelistedTokens[_token];
         delete priceFeeds[_token];
-        delete pricePrecisions[_token];
+        delete priceDecimals[_token];
         delete redemptionBasisPoints[_token];
         delete tokenDecimals[_token];
         delete stableTokens[_token];
@@ -295,28 +295,14 @@ contract Vault is ReentrancyGuard {
     }
 
     function getMaxPrice(address _token) public view returns (uint256) {
-        address priceFeedAddress = priceFeeds[_token];
-        require(priceFeedAddress != address(0), "Vault: invalid price feed");
-        IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
-
-        uint256 price = 0;
-        uint80 roundId = priceFeed.latestRound();
-
-        for (uint256 i = 0; i < priceSampleSpace; i++) {
-            if (roundId < i) { break; }
-            (, int256 p, , ,) = priceFeed.getRoundData(roundId - uint80(i));
-            require(p > 0, "Vault: invalid price");
-
-            if (uint256(p) > price) {
-                price = uint256(p);
-            }
-        }
-
-        require(price > 0, "Vault: could not fetch price");
-        return price;
+        return getPrice(_token, true);
     }
 
     function getMinPrice(address _token) public view returns (uint256) {
+        return getPrice(_token, false);
+    }
+
+    function getPrice(address _token, bool _maximise) public view returns (uint256) {
         address priceFeedAddress = priceFeeds[_token];
         require(priceFeedAddress != address(0), "Vault: invalid price feed");
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
@@ -324,9 +310,10 @@ contract Vault is ReentrancyGuard {
         uint256 price = 0;
         uint80 roundId = priceFeed.latestRound();
 
-        for (uint256 i = 0; i < priceSampleSpace; i++) {
+        for (uint80 i = 0; i < priceSampleSpace; i++) {
             if (roundId < i) { break; }
-            (, int256 p, , ,) = priceFeed.getRoundData(roundId - uint80(i));
+            if (roundId - i == 0) { continue; }
+            (, int256 p, , ,) = priceFeed.getRoundData(roundId - i);
             require(p > 0, "Vault: invalid price");
 
             if (price == 0) {
@@ -334,7 +321,11 @@ contract Vault is ReentrancyGuard {
                 continue;
             }
 
-            if (uint256(p) < price) {
+            if (_maximise && uint256(p) < price) {
+                price = uint256(p);
+            }
+
+            if (!_maximise && price < uint256(p)) {
                 price = uint256(p);
             }
         }
@@ -343,11 +334,10 @@ contract Vault is ReentrancyGuard {
         return price;
     }
 
-
     function getPricePrecision(address _token) public view returns (uint256) {
-        uint256 precision = pricePrecisions[_token];
-        require(precision > 0, "Vault: invalid price precision");
-        return precision;
+        uint256 decimals = priceDecimals[_token];
+        require(decimals > 0, "Vault: invalid price decimals");
+        return 10 ** decimals;
     }
 
     function getRedemptionBasisPoints(address _token) public view returns (uint256) {
