@@ -29,26 +29,27 @@ contract Vault is ReentrancyGuard {
 
     address public gusd;
     address public gov;
+    uint256 public govUnlockTime;
 
-    uint256 public liquidationFeeUsd = 5; // 5 USD
+    uint256 public liquidationFeeUsd;
     uint256 public maxLeverage = 500000; // 50x
 
-    // with the default settings, the funding rate will be 0.3% * utilisation ratio
-    // where 3000 / 1000000 => 0.3%,
+    // with the default settings, the funding rate will be 0.06% * utilisation ratio
+    // where 600 / 1000000 => 0.06%,
     // and utilisation ratio => reservedAmounts[_token] / _token.balanceOf(address(this))
     uint256 public fundingInterval = 8 hours;
-    uint256 public fundingRateFactor = 3000;
+    uint256 public fundingRateFactor = 600;
     uint256 public lastFundingTime;
 
     uint256 public swapFeeBasisPoints = 20; // 0.2%
     uint256 public marginFeeBasisPoints = 2; // 0.02%
 
     mapping (address => bool) public whitelistedTokens;
-    mapping (address => bool) public stableTokens;
     mapping (address => address) public priceFeeds;
     mapping (address => uint256) public pricePrecisions;
     mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public tokenDecimals;
+    mapping (address => bool) public stableTokens;
 
     mapping (address => uint256) public gusdAmounts;
     mapping (address => uint256) public reservedAmounts;
@@ -58,7 +59,12 @@ contract Vault is ReentrancyGuard {
     mapping (bytes32 => Position) public positions;
 
     modifier onlyGov() {
-        require(msg.sender == gov, "GUSD: forbidden");
+        require(msg.sender == gov, "Vault: forbidden");
+        _;
+    }
+
+    modifier afterGovUnlockTime() {
+        require(block.timestamp > govUnlockTime, "Vault: govUnlockTime has not yet passed");
         _;
     }
 
@@ -66,14 +72,52 @@ contract Vault is ReentrancyGuard {
         gov = msg.sender;
     }
 
-    function initialize(
-        address[] memory _addresses
-    ) external onlyGov {
-        gusd = _addresses[0];
+    function initialize(address _gusd, uint256 _liquidationFeeUsd) external onlyGov {
+        require(!isInitialized, "Vault: already initialized");
+        isInitialized = true;
+
+        gusd = _gusd;
+        liquidationFeeUsd = _liquidationFeeUsd;
     }
 
     function setGov(address _gov) external onlyGov {
         gov = _gov;
+    }
+
+    function extendGovUnlockTime(uint256 _govUnlockTime) external onlyGov {
+        require(_govUnlockTime > govUnlockTime, "Vault: invalid _govUnlockTime");
+        govUnlockTime = _govUnlockTime;
+    }
+
+    function addWhitelistedToken(
+        address _token,
+        address _priceFeed,
+        uint256 _precision,
+        uint256 _redemptionBps,
+        uint256 _decimals,
+        bool _isStable
+    ) external nonReentrant onlyGov afterGovUnlockTime {
+        require(!whitelistedTokens[_token], "Vault: token already whitelisted");
+
+        whitelistedTokens[_token] = true;
+        priceFeeds[_token] = _priceFeed;
+        pricePrecisions[_token] = _precision;
+        redemptionBasisPoints[_token] = _redemptionBps;
+        tokenDecimals[_token] = _decimals;
+        stableTokens[_token] = _isStable;
+
+        // validate price feed
+        getMaxPrice(_token);
+    }
+
+    function removeWhitelistedToken(address _token) external nonReentrant onlyGov afterGovUnlockTime {
+        require(whitelistedTokens[_token], "Vault: token not whitelisted");
+        delete whitelistedTokens[_token];
+        delete priceFeeds[_token];
+        delete pricePrecisions[_token];
+        delete redemptionBasisPoints[_token];
+        delete tokenDecimals[_token];
+        delete stableTokens[_token];
     }
 
     function buyGUSD(address _token, uint256 _tokenAmount, address _receiver) external nonReentrant {
