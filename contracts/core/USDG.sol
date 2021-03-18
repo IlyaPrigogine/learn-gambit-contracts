@@ -5,14 +5,14 @@ pragma solidity 0.6.12;
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
-import "./interfaces/IGUSD.sol";
+import "./interfaces/IUSDG.sol";
 
-contract GUSD is IERC20, IGUSD {
+contract USDG is IERC20, IUSDG {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    string public constant name = "Gambit USD";
-    string public constant symbol = "gUSD";
+    string public constant name = "USD Gambit";
+    string public constant symbol = "USDG";
     uint8 public constant decimals = 18;
 
     uint256 public override totalSupply;
@@ -24,12 +24,12 @@ contract GUSD is IERC20, IGUSD {
     mapping (address => mapping (address => uint256)) public allowances;
 
     modifier onlyGov() {
-        require(msg.sender == gov, "GUSD: forbidden");
+        require(msg.sender == gov, "USDG: forbidden");
         _;
     }
 
     modifier onlyVault() {
-        require(msg.sender == vault, "GUSD: forbidden");
+        require(msg.sender == vault, "USDG: forbidden");
         _;
     }
 
@@ -74,24 +74,24 @@ contract GUSD is IERC20, IGUSD {
     }
 
     function transferFrom(address _sender, address _recipient, uint256 _amount) external override returns (bool) {
-        uint256 nextAllowance = allowances[_sender][msg.sender].sub(_amount, "GUSD: transfer amount exceeds allowance");
+        uint256 nextAllowance = allowances[_sender][msg.sender].sub(_amount, "USDG: transfer amount exceeds allowance");
         _approve(_sender, msg.sender, nextAllowance);
         _transfer(_sender, _recipient, _amount);
         return true;
     }
 
     function _transfer(address _sender, address _recipient, uint256 _amount) private {
-        require(_sender != address(0), "GUSD: transfer from the zero address");
-        require(_recipient != address(0), "GUSD: transfer to the zero address");
+        require(_sender != address(0), "USDG: transfer from the zero address");
+        require(_recipient != address(0), "USDG: transfer to the zero address");
 
-        balances[_sender] = balances[_sender].sub(_amount, "GUSD: transfer amount exceeds balance");
+        balances[_sender] = balances[_sender].sub(_amount, "USDG: transfer amount exceeds balance");
         balances[_recipient] = balances[_recipient].add(_amount);
 
         emit Transfer(_sender, _recipient,_amount);
     }
 
     function _mint(address _account, uint256 _amount) private {
-        require(_account != address(0), "GUSD: mint to the zero address");
+        require(_account != address(0), "USDG: mint to the zero address");
 
         totalSupply = totalSupply.add(_amount);
         balances[_account] = balances[_account].add(_amount);
@@ -100,7 +100,7 @@ contract GUSD is IERC20, IGUSD {
     }
 
     function _burn(address _account, uint256 _amount) private {
-        require(_account != address(0), "GUSD: burn from the zero address");
+        require(_account != address(0), "USDG: burn from the zero address");
 
         totalSupply = totalSupply.sub(_amount);
         balances[_account] = balances[_account].sub(_amount);
@@ -109,8 +109,8 @@ contract GUSD is IERC20, IGUSD {
     }
 
     function _approve(address _owner, address _spender, uint256 _amount) private {
-        require(_owner != address(0), "GUSD: approve from the zero address");
-        require(_spender != address(0), "GUSD: approve to the zero address");
+        require(_owner != address(0), "USDG: approve from the zero address");
+        require(_spender != address(0), "USDG: approve to the zero address");
 
         allowances[_owner][_spender] = _amount;
 

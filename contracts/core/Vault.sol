@@ -7,8 +7,8 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 
-import "./interfaces/IGUSD.sol";
-import "./interfaces/IPriceFeed.sol";
+import "./interfaces/IUSDG.sol";
+import "../oracle/interfaces/IPriceFeed.sol";
 
 contract Vault is ReentrancyGuard {
     using SafeMath for uint256;
@@ -27,12 +27,13 @@ contract Vault is ReentrancyGuard {
 
     bool public isInitialized;
 
-    address public gusd;
+    address public usdg;
     address public gov;
     uint256 public govUnlockTime;
 
     uint256 public liquidationFeeUsd;
     uint256 public maxLeverage = 500000; // 50x
+    uint256 public priceSampleSpace = 3;
 
     // with the default settings, the funding rate will be 0.06% * utilisation ratio
     // where 600 / 1000000 => 0.06%,
@@ -51,7 +52,7 @@ contract Vault is ReentrancyGuard {
     mapping (address => uint256) public tokenDecimals;
     mapping (address => bool) public stableTokens;
 
-    mapping (address => uint256) public gusdAmounts;
+    mapping (address => uint256) public usdgAmounts;
     mapping (address => uint256) public reservedAmounts;
     mapping (address => uint256) public cumulativeFundingRates;
     mapping (address => uint256) public feeReserves;
@@ -72,11 +73,11 @@ contract Vault is ReentrancyGuard {
         gov = msg.sender;
     }
 
-    function initialize(address _gusd, uint256 _liquidationFeeUsd) external onlyGov {
+    function initialize(address _usdg, uint256 _liquidationFeeUsd) external onlyGov {
         require(!isInitialized, "Vault: already initialized");
         isInitialized = true;
 
-        gusd = _gusd;
+        usdg = _usdg;
         liquidationFeeUsd = _liquidationFeeUsd;
     }
 
@@ -120,7 +121,7 @@ contract Vault is ReentrancyGuard {
         delete stableTokens[_token];
     }
 
-    function buyGUSD(address _token, uint256 _tokenAmount, address _receiver) external nonReentrant {
+    function buyUSDG(address _token, uint256 _tokenAmount, address _receiver) external nonReentrant {
         require(_tokenAmount > 0, "Vault: invalid _tokenAmount");
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
         updateCumulativeFundingRate(_token);
@@ -130,33 +131,33 @@ contract Vault is ReentrancyGuard {
 
         uint256 amountAfterFees = _collectSwapFees(_token, _tokenAmount);
         uint256 mintAmount = amountAfterFees.mul(price).div(pricePrecision);
-        mintAmount = adjustForDecimals(mintAmount, _token, gusd);
+        mintAmount = adjustForDecimals(mintAmount, _token, usdg);
 
-        gusdAmounts[_token] = gusdAmounts[_token].add(mintAmount);
+        usdgAmounts[_token] = usdgAmounts[_token].add(mintAmount);
 
         _transferIn(_token, _tokenAmount);
-        IGUSD(gusd).mint(_receiver, mintAmount);
+        IUSDG(usdg).mint(_receiver, mintAmount);
     }
 
-    function sellGUSD(address _token, uint256 _gusdAmount, address _receiver) external nonReentrant {
-        require(_gusdAmount > 0, "Vault: invalid _gusdAmount");
+    function sellUSDG(address _token, uint256 _usdgAmount, address _receiver) external nonReentrant {
+        require(_usdgAmount > 0, "Vault: invalid _usdgAmount");
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
         updateCumulativeFundingRate(_token);
 
         uint256 price = getMaxPrice(_token);
         uint256 pricePrecision = getPricePrecision(_token);
 
-        uint256 tokenAmount = _gusdAmount.mul(pricePrecision).div(price);
-        uint256 redemptionAmount = getRedemptionAmount(_token, _gusdAmount);
+        uint256 tokenAmount = _usdgAmount.mul(pricePrecision).div(price);
+        uint256 redemptionAmount = getRedemptionAmount(_token, _usdgAmount);
         if (tokenAmount > redemptionAmount) {
             tokenAmount = redemptionAmount;
         }
 
         uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
 
-        gusdAmounts[_token] = gusdAmounts[_token].sub(_gusdAmount);
+        usdgAmounts[_token] = usdgAmounts[_token].sub(_usdgAmount);
 
-        IGUSD(gusd).burn(msg.sender, _gusdAmount);
+        IUSDG(usdg).burn(msg.sender, _usdgAmount);
         _transferOut(_token, amountAfterFees, _receiver);
     }
 
@@ -281,8 +282,8 @@ contract Vault is ReentrancyGuard {
 
         uint256 amountOut = getSwapAmountOut(_tokenIn, _tokenOut, _amountIn);
 
-        gusdAmounts[_tokenIn] = gusdAmounts[_tokenIn].add(_amountIn);
-        gusdAmounts[_tokenOut] = gusdAmounts[_tokenOut].sub(amountOut);
+        usdgAmounts[_tokenIn] = usdgAmounts[_tokenIn].add(_amountIn);
+        usdgAmounts[_tokenOut] = usdgAmounts[_tokenOut].sub(amountOut);
 
         _transferIn(_tokenIn, _amountIn);
         _transferOut(_tokenOut, amountOut, _receiver);
@@ -293,25 +294,55 @@ contract Vault is ReentrancyGuard {
         return liquidationFeeUsd.mul(pricePrecision);
     }
 
-    function getMinPrice(address _token) public view returns (uint256) {
-        address priceFeed = priceFeeds[_token];
-        require(priceFeed != address(0), "Vault: invalid price feed");
-
-        int256 answer = IPriceFeed(priceFeed).latestAnswer();
-        require(answer > 0, "Vault: invalid price");
-
-        return uint256(answer);
-    }
-
     function getMaxPrice(address _token) public view returns (uint256) {
-        address priceFeed = priceFeeds[_token];
-        require(priceFeed != address(0), "Vault: invalid price feed");
+        address priceFeedAddress = priceFeeds[_token];
+        require(priceFeedAddress != address(0), "Vault: invalid price feed");
+        IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
 
-        int256 answer = IPriceFeed(priceFeed).latestAnswer();
-        require(answer > 0, "Vault: invalid price");
+        uint256 price = 0;
+        uint80 roundId = priceFeed.latestRound();
 
-        return uint256(answer);
+        for (uint256 i = 0; i < priceSampleSpace; i++) {
+            if (roundId < i) { break; }
+            (, int256 p, , ,) = priceFeed.getRoundData(roundId - uint80(i));
+            require(p > 0, "Vault: invalid price");
+
+            if (uint256(p) > price) {
+                price = uint256(p);
+            }
+        }
+
+        require(price > 0, "Vault: could not fetch price");
+        return price;
     }
+
+    function getMinPrice(address _token) public view returns (uint256) {
+        address priceFeedAddress = priceFeeds[_token];
+        require(priceFeedAddress != address(0), "Vault: invalid price feed");
+        IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
+
+        uint256 price = 0;
+        uint80 roundId = priceFeed.latestRound();
+
+        for (uint256 i = 0; i < priceSampleSpace; i++) {
+            if (roundId < i) { break; }
+            (, int256 p, , ,) = priceFeed.getRoundData(roundId - uint80(i));
+            require(p > 0, "Vault: invalid price");
+
+            if (price == 0) {
+                price = uint256(p);
+                continue;
+            }
+
+            if (uint256(p) < price) {
+                price = uint256(p);
+            }
+        }
+
+        require(price > 0, "Vault: could not fetch price");
+        return price;
+    }
+
 
     function getPricePrecision(address _token) public view returns (uint256) {
         uint256 precision = pricePrecisions[_token];
@@ -325,16 +356,16 @@ contract Vault is ReentrancyGuard {
         return basisPoints;
     }
 
-    function getRedemptionAmount(address _token, uint256 _gusdAmount) public view returns (uint256) {
+    function getRedemptionAmount(address _token, uint256 _usdgAmount) public view returns (uint256) {
         uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
         uint256 basisPoints = getRedemptionBasisPoints(_token);
-        uint256 totalGusdAmount = gusdAmounts[_token];
-        require(totalGusdAmount > 0, "Vault: invalid gusd amount");
+        uint256 totalUsdgAmount = usdgAmounts[_token];
+        require(totalUsdgAmount > 0, "Vault: invalid usdg amount");
 
-        uint256 redemptionAmount = _gusdAmount.mul(tokenBalance).div(totalGusdAmount);
+        uint256 redemptionAmount = _usdgAmount.mul(tokenBalance).div(totalUsdgAmount);
         redemptionAmount = redemptionAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
 
-        return adjustForDecimals(redemptionAmount, gusd, _token);
+        return adjustForDecimals(redemptionAmount, usdg, _token);
     }
 
     function getSwapAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
