@@ -40,7 +40,6 @@ contract Vault is ReentrancyGuard {
     // and utilisation ratio => reservedAmounts[_token] / _token.balanceOf(address(this))
     uint256 public fundingInterval = 8 hours;
     uint256 public fundingRateFactor = 600;
-    uint256 public lastFundingTime;
 
     uint256 public swapFeeBasisPoints = 20; // 0.2%
     uint256 public marginFeeBasisPoints = 2; // 0.02%
@@ -55,8 +54,10 @@ contract Vault is ReentrancyGuard {
     mapping (address => uint256) public usdgAmounts;
     mapping (address => uint256) public reservedAmounts;
     mapping (address => uint256) public cumulativeFundingRates;
-    mapping (address => uint256) public feeReserves;
+    mapping (address => uint256) public lastFundingTimes;
+    mapping (address => uint256) public tokenBalances;
 
+    mapping (address => uint256) public feeReserves;
     mapping (bytes32 => Position) public positions;
 
     modifier onlyGov() {
@@ -79,6 +80,8 @@ contract Vault is ReentrancyGuard {
 
         usdg = _usdg;
         liquidationFeeUsd = _liquidationFeeUsd;
+
+        tokenDecimals[usdg] = 18;
     }
 
     function setGov(address _gov) external onlyGov {
@@ -121,27 +124,29 @@ contract Vault is ReentrancyGuard {
         delete stableTokens[_token];
     }
 
-    function buyUSDG(address _token, uint256 _tokenAmount, address _receiver) external nonReentrant {
-        require(_tokenAmount > 0, "Vault: invalid _tokenAmount");
+    function buyUSDG(address _token, address _receiver) external nonReentrant {
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
+
+        uint256 tokenAmount = _transferIn(_token);
+        require(tokenAmount > 0, "Vault: invalid tokenAmount");
+
         updateCumulativeFundingRate(_token);
 
         uint256 price = getMinPrice(_token);
         uint256 pricePrecision = getPricePrecision(_token);
 
-        uint256 amountAfterFees = _collectSwapFees(_token, _tokenAmount);
+        uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
         uint256 mintAmount = amountAfterFees.mul(price).div(pricePrecision);
         mintAmount = adjustForDecimals(mintAmount, _token, usdg);
+        require(mintAmount > 0, "Vault: invalid mintAmount");
 
         usdgAmounts[_token] = usdgAmounts[_token].add(mintAmount);
-
-        _transferIn(_token, _tokenAmount);
         IUSDG(usdg).mint(_receiver, mintAmount);
     }
 
     function sellUSDG(address _token, uint256 _usdgAmount, address _receiver) external nonReentrant {
-        require(_usdgAmount > 0, "Vault: invalid _usdgAmount");
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
+        require(_usdgAmount > 0, "Vault: invalid _usdgAmount");
         updateCumulativeFundingRate(_token);
 
         uint256 price = getMaxPrice(_token);
@@ -161,20 +166,19 @@ contract Vault is ReentrancyGuard {
         _transferOut(_token, amountAfterFees, _receiver);
     }
 
-    function depositCollateral(address _collateralToken, address _indexToken, uint256 _collateral, bool _isLong) external nonReentrant {
-        require(_collateral > 0, "Vault: invalid _collateral");
+    function depositCollateral(address _collateralToken, address _indexToken, bool _isLong) external nonReentrant {
+        uint256 collateral = _transferIn(_collateralToken);
+        require(collateral > 0, "Vault: invalid collateral");
 
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
-
-        _transferIn(_collateralToken, usdToTokenMax(_collateralToken, _collateral));
 
         bytes32 key = getPositionKey(msg.sender, _collateralToken, _indexToken, _isLong);
         Position storage position = positions[key];
 
         _collectMarginFees(_collateralToken, 0, position.size, position.entryFundingRate);
 
-        position.collateral = position.collateral.add(_collateral);
+        position.collateral = position.collateral.add(usdToTokenMin(_collateralToken, collateral));
         position.entryFundingRate = cumulativeFundingRates[_collateralToken];
 
         (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
@@ -201,7 +205,7 @@ contract Vault is ReentrancyGuard {
         _transferOut(_collateralToken, usdToTokenMin(_collateralToken, _collateral), msg.sender);
     }
 
-    function increasePosition(address _collateralToken, address _indexToken, uint256 _collateral, uint256 _size, bool _isLong) external nonReentrant {
+    function increasePosition(address _collateralToken, address _indexToken, uint256 _size, bool _isLong) external nonReentrant {
         require(_size > 0, "Vault: invalid _size");
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -220,14 +224,9 @@ contract Vault is ReentrancyGuard {
         }
 
         uint256 fee = _collectMarginFees(_collateralToken, _size, position.size, position.entryFundingRate);
+        uint256 collateral = _transferIn(_collateralToken);
 
-        uint256 collateral = position.collateral;
-        if (_collateral > 0) {
-            _transferIn(_collateralToken, usdToTokenMax(_collateralToken, _collateral));
-            collateral = collateral.add(_collateral);
-        }
-
-        position.collateral = collateral.sub(fee);
+        position.collateral = position.collateral.add(tokenToUsdMin(_collateralToken, collateral)).sub(fee);
         position.entryFundingRate = cumulativeFundingRates[_collateralToken];
         position.size = position.size.add(_size);
 
@@ -273,19 +272,20 @@ contract Vault is ReentrancyGuard {
         _liquidatePosition(_account, _collateralToken, _indexToken, _isLong, _feeReceiver);
     }
 
-    function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, address _receiver) external nonReentrant {
-        require(_amountIn > 0, "Vault: invalid _amountIn");
+    function swap(address _tokenIn, address _tokenOut, address _receiver) external nonReentrant {
         require(whitelistedTokens[_tokenIn], "Vault: _tokenIn not whitelisted");
         require(whitelistedTokens[_tokenOut], "Vault: _tokenOut not whitelisted");
         updateCumulativeFundingRate(_tokenIn);
         updateCumulativeFundingRate(_tokenOut);
 
-        uint256 amountOut = getSwapAmountOut(_tokenIn, _tokenOut, _amountIn);
+        uint256 amountIn = _transferIn(_tokenIn);
+        require(amountIn > 0, "Vault: invalid amountIn");
 
-        usdgAmounts[_tokenIn] = usdgAmounts[_tokenIn].add(_amountIn);
-        usdgAmounts[_tokenOut] = usdgAmounts[_tokenOut].sub(amountOut);
+        uint256 amountOut = getSwapAmountOut(_tokenIn, _tokenOut, amountIn);
 
-        _transferIn(_tokenIn, _amountIn);
+        usdgAmounts[_tokenIn] = usdgAmounts[_tokenIn].add(tokenToUsdMax(_tokenIn, amountIn));
+        usdgAmounts[_tokenOut] = usdgAmounts[_tokenOut].sub(tokenToUsdMin(_tokenOut, amountOut));
+
         _transferOut(_tokenOut, amountOut, _receiver);
     }
 
@@ -321,11 +321,11 @@ contract Vault is ReentrancyGuard {
                 continue;
             }
 
-            if (_maximise && uint256(p) < price) {
+            if (_maximise && uint256(p) > price) {
                 price = uint256(p);
             }
 
-            if (!_maximise && price < uint256(p)) {
+            if (!_maximise && uint256(p) < price) {
                 price = uint256(p);
             }
         }
@@ -379,18 +379,27 @@ contract Vault is ReentrancyGuard {
         return balance.sub(reservedAmounts[_token]);
     }
 
+    function tokenToUsdMax(address _token, uint256 _tokenAmount) public view returns (uint256) {
+        if (_tokenAmount == 0) { return 0; }
+        uint256 price = getMinPrice(_token);
+        return _tokenAmount.mul(price);
+    }
+
     function tokenToUsdMin(address _token, uint256 _tokenAmount) public view returns (uint256) {
+        if (_tokenAmount == 0) { return 0; }
         uint256 price = getMaxPrice(_token);
         return _tokenAmount.mul(price);
     }
 
-    function usdToTokenMin(address _token, uint256 _usdAmount) public view returns (uint256) {
-        uint256 price = getMaxPrice(_token);
+    function usdToTokenMax(address _token, uint256 _usdAmount) public view returns (uint256) {
+        if (_usdAmount == 0) { return 0; }
+        uint256 price = getMinPrice(_token);
         return _usdAmount.div(price);
     }
 
-    function usdToTokenMax(address _token, uint256 _usdAmount) public view returns (uint256) {
-        uint256 price = getMinPrice(_token);
+    function usdToTokenMin(address _token, uint256 _usdAmount) public view returns (uint256) {
+        if (_usdAmount == 0) { return 0; }
+        uint256 price = getMaxPrice(_token);
         return _usdAmount.div(price);
     }
 
@@ -404,22 +413,30 @@ contract Vault is ReentrancyGuard {
     }
 
     function updateCumulativeFundingRate(address _token) public {
-        if (lastFundingTime.add(fundingInterval) > block.timestamp) {
+        if (lastFundingTimes[_token] == 0) {
+            lastFundingTimes[_token] = block.timestamp.div(fundingInterval).mul(fundingInterval);
+            return;
+        }
+
+        if (lastFundingTimes[_token].add(fundingInterval) > block.timestamp) {
             return;
         }
 
         uint256 fundingRate = getNextFundingRate(_token);
         cumulativeFundingRates[_token] = cumulativeFundingRates[_token].add(fundingRate);
-        lastFundingTime = block.timestamp.div(fundingInterval).mul(fundingInterval);
+        lastFundingTimes[_token] = block.timestamp.div(fundingInterval).mul(fundingInterval);
     }
 
     function getNextFundingRate(address _token) public view returns (uint256) {
-        if (lastFundingTime.add(fundingInterval) > block.timestamp) {
+        if (lastFundingTimes[_token].add(fundingInterval) > block.timestamp) {
             return 0;
         }
 
-        uint256 intervals = block.timestamp.sub(lastFundingTime).div(fundingInterval);
+        uint256 intervals = block.timestamp.sub(lastFundingTimes[_token]).div(fundingInterval);
         uint256 balance = IERC20(_token).balanceOf(address(this));
+        if (balance == 0) {
+            return 0;
+        }
         return fundingRateFactor.mul(reservedAmounts[_token]).mul(intervals).div(balance);
     }
 
@@ -503,9 +520,10 @@ contract Vault is ReentrancyGuard {
     }
 
     function _collectSwapFees(address _token, uint256 _amount) private returns (uint256) {
-        uint256 feeAmount = _amount.mul(swapFeeBasisPoints).div(BASIS_POINTS_DIVISOR);
+        uint256 afterFeeAmount = _amount.mul(BASIS_POINTS_DIVISOR.sub(swapFeeBasisPoints)).div(BASIS_POINTS_DIVISOR);
+        uint256 feeAmount = _amount.sub(afterFeeAmount);
         feeReserves[_token] = feeReserves[_token].add(feeAmount);
-        return _amount.sub(feeAmount);
+        return afterFeeAmount;
     }
 
     function _collectMarginFees(address _token, uint256 _size, uint256 _positionSize, uint256 _entryFundingRate) private returns (uint256) {
@@ -519,18 +537,20 @@ contract Vault is ReentrancyGuard {
         return feeUsd;
     }
 
-    function _transferIn(address _token, uint256 _amount) private {
-        uint256 tokenBefore = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
-        uint256 tokenAfter = IERC20(_token).balanceOf(address(this));
-        require(tokenAfter.sub(tokenBefore) == _amount, "Vault: invalid transfer");
+    function _transferIn(address _token) private returns (uint256) {
+        uint256 prevBalance = tokenBalances[_token];
+        uint256 nextBalance = IERC20(_token).balanceOf(address(this));
+        tokenBalances[_token] = nextBalance;
+
+        return nextBalance.sub(prevBalance);
     }
 
     function _transferOut(address _token, uint256 _amount, address _receiver) private {
-        uint256 balance = IERC20(_token).balanceOf(address(this));
-        uint256 newBalance = balance.sub(_amount);
-        require(newBalance >= reservedAmounts[_token], "Vault: reserve limit exceeded");
         IERC20(_token).safeTransfer(_receiver, _amount);
+
+        uint256 nextBalance = IERC20(_token).balanceOf(address(this));
+        require(nextBalance >= reservedAmounts[_token], "Vault: reserve limit exceeded");
+        tokenBalances[_token] = nextBalance;
     }
 
     function _increaseReservedAmount(address _token, uint256 _amount) private {
