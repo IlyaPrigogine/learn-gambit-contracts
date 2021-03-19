@@ -34,7 +34,7 @@ describe("Vault", function () {
 
     expect(await vault.gov()).eq(wallet.address)
     expect(await vault.usdg()).eq(usdg.address)
-    expect(await vault.liquidationFeeUsd()).eq(5)
+    expect(await vault.liquidationFeeUsd()).eq("5000000000000000000")
     expect(await vault.tokenDecimals(usdg.address)).eq(18)
   })
 
@@ -187,6 +187,8 @@ describe("Vault", function () {
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(0)
     expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
     await bnb.mint(user0.address, 100)
     await bnb.connect(user0).transfer(vault.address, 100)
     const tx = await vault.connect(user0).buyUSDG(bnb.address, user1.address)
@@ -194,6 +196,8 @@ describe("Vault", function () {
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(29700)
     expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
   })
 
   it("buyUSDG uses min price", async () => {
@@ -216,12 +220,16 @@ describe("Vault", function () {
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(0)
     expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
     await bnb.mint(user0.address, 100)
     await bnb.connect(user0).transfer(vault.address, 100)
     await vault.connect(user0).buyUSDG(bnb.address, user1.address)
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(19800)
     expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(19800)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
   })
 
   it("buyUSDG updates fees", async () => {
@@ -241,12 +249,16 @@ describe("Vault", function () {
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(0)
     expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
     await bnb.mint(user0.address, 10000)
     await bnb.connect(user0).transfer(vault.address, 10000)
     await vault.connect(user0).buyUSDG(bnb.address, user1.address)
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(9980 * 300)
     expect(await vault.feeReserves(bnb.address)).eq(20)
+    expect(await vault.usdgAmounts(bnb.address)).eq(9980 * 300)
+    expect(await vault.poolAmounts(bnb.address)).eq(10000 - 20)
   })
 
   it("buyUSDG adjusts for decimals", async () => {
@@ -266,11 +278,166 @@ describe("Vault", function () {
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user1.address)).eq(0)
     expect(await vault.feeReserves(btc.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
     await btc.mint(user0.address, expandDecimals(1, 8))
     await btc.connect(user0).transfer(vault.address, expandDecimals(1, 8))
     await vault.connect(user0).buyUSDG(btc.address, user1.address)
     expect(await usdg.balanceOf(user0.address)).eq(0)
     expect(await vault.feeReserves(btc.address)).eq(200000)
     expect(await usdg.balanceOf(user1.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(120, 18))) // 0.2% of 60,000 => 120
+    expect(await vault.usdgAmounts(btc.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(120, 18)))
+    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub(200000))
+  })
+
+  it("sellUSDG", async () => {
+    await expect(vault.connect(user0).sellUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: _token not whitelisted")
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await vault.addWhitelistedToken(
+      bnb.address, // _token
+      bnbPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      18, // _tokenDecimals
+      false // _isStable
+    )
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
+    await vault.addWhitelistedToken(
+      btc.address, // _token
+      btcPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      8, // _tokenDecimals
+      false // _isStable
+    )
+
+    await bnb.mint(user0.address, 100)
+
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
+    expect(await bnb.balanceOf(user0.address)).eq(100)
+    await bnb.connect(user0).transfer(vault.address, 100)
+    await vault.connect(user0).buyUSDG(bnb.address, user0.address)
+    expect(await usdg.balanceOf(user0.address)).eq(29700)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+
+    await expect(vault.connect(user0).sellUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: invalid usdgAmount")
+
+    await usdg.connect(user0).transfer(vault.address, 15000)
+
+    await expect(vault.connect(user0).sellUSDG(btc.address, user1.address))
+      .to.be.revertedWith("Vault: invalid totalUsdgAmount")
+
+    await vault.connect(user0).sellUSDG(bnb.address, user1.address)
+    expect(await usdg.balanceOf(user0.address)).eq(29700 - 15000)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(2)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700 - 15000)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1 - 45)
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+    expect(await bnb.balanceOf(user1.address)).eq(45 - 1) // (15000 / 29700) * 99 => 50, 50 * 0.9 => 45
+  })
+
+  it("sellUSDG after a price increase", async () => {
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await vault.addWhitelistedToken(
+      bnb.address, // _token
+      bnbPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      18, // _tokenDecimals
+      false // _isStable
+    )
+
+    await bnb.mint(user0.address, 100)
+
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
+    expect(await bnb.balanceOf(user0.address)).eq(100)
+    await bnb.connect(user0).transfer(vault.address, 100)
+    await vault.connect(user0).buyUSDG(bnb.address, user0.address)
+
+    expect(await usdg.balanceOf(user0.address)).eq(29700)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+
+    expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(400))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(600))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(500))
+
+    await usdg.connect(user0).transfer(vault.address, 15000)
+    await vault.connect(user0).sellUSDG(bnb.address, user1.address)
+
+    expect(await usdg.balanceOf(user0.address)).eq(29700 - 15000)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(2)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700 - 15000)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1 - 25)
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+    expect(await bnb.balanceOf(user1.address)).eq(25 - 1) // (15000 / 600) => 25
+  })
+
+  it("swap", async () => {
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await vault.addWhitelistedToken(
+      bnb.address, // _token
+      bnbPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      18, // _tokenDecimals
+      false // _isStable
+    )
+
+    await bnb.mint(user0.address, 100)
+
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
+    expect(await bnb.balanceOf(user0.address)).eq(100)
+    await bnb.connect(user0).transfer(vault.address, 100)
+    await vault.connect(user0).buyUSDG(bnb.address, user0.address)
+
+    expect(await usdg.balanceOf(user0.address)).eq(29700)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+
+    expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(400))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(600))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(500))
+
+    await usdg.connect(user0).transfer(vault.address, 15000)
+    await vault.connect(user0).sellUSDG(bnb.address, user1.address)
+
+    expect(await usdg.balanceOf(user0.address)).eq(29700 - 15000)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(2)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700 - 15000)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1 - 25)
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+    expect(await bnb.balanceOf(user1.address)).eq(25 - 1) // (15000 / 600) => 25
   })
 })

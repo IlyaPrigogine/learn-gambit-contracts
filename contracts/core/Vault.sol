@@ -145,7 +145,7 @@ contract Vault is ReentrancyGuard {
         IUSDG(usdg).mint(_receiver, mintAmount);
 
         _increaseUsdgAmount(_token, mintAmount);
-        _increasePoolAmount(_token, tokenAmount);
+        _increasePoolAmount(_token, amountAfterFees);
     }
 
     function sellUSDG(address _token, address _receiver) external nonReentrant {
@@ -173,6 +173,7 @@ contract Vault is ReentrancyGuard {
         IUSDG(usdg).burn(address(this), usdgAmount);
 
         uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
+        require(amountAfterFees > 0, "Vault: invalid amountAfterFees");
         _transferOut(_token, amountAfterFees, _receiver);
     }
 
