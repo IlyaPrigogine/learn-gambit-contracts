@@ -291,6 +291,7 @@ contract Vault is ReentrancyGuard {
 
         bytes32 key = getPositionKey(msg.sender, _collateralToken, _indexToken, _isLong);
         Position storage position = positions[key];
+        require(position.size > 0, "Vault: empty position");
 
         _collectMarginFees(_collateralToken, 0, position.size, position.entryFundingRate);
 
