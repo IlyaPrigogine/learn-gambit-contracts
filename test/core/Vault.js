@@ -255,10 +255,10 @@ describe("Vault", function () {
     await bnb.connect(user0).transfer(vault.address, 10000)
     await vault.connect(user0).buyUSDG(bnb.address, user1.address)
     expect(await usdg.balanceOf(user0.address)).eq(0)
-    expect(await usdg.balanceOf(user1.address)).eq(9980 * 300)
-    expect(await vault.feeReserves(bnb.address)).eq(20)
-    expect(await vault.usdgAmounts(bnb.address)).eq(9980 * 300)
-    expect(await vault.poolAmounts(bnb.address)).eq(10000 - 20)
+    expect(await usdg.balanceOf(user1.address)).eq(9970 * 300)
+    expect(await vault.feeReserves(bnb.address)).eq(30)
+    expect(await vault.usdgAmounts(bnb.address)).eq(9970 * 300)
+    expect(await vault.poolAmounts(bnb.address)).eq(10000 - 30)
   })
 
   it("buyUSDG adjusts for decimals", async () => {
@@ -284,10 +284,10 @@ describe("Vault", function () {
     await btc.connect(user0).transfer(vault.address, expandDecimals(1, 8))
     await vault.connect(user0).buyUSDG(btc.address, user1.address)
     expect(await usdg.balanceOf(user0.address)).eq(0)
-    expect(await vault.feeReserves(btc.address)).eq(200000)
-    expect(await usdg.balanceOf(user1.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(120, 18))) // 0.2% of 60,000 => 120
-    expect(await vault.usdgAmounts(btc.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(120, 18)))
-    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub(200000))
+    expect(await vault.feeReserves(btc.address)).eq(300000)
+    expect(await usdg.balanceOf(user1.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(180, 18))) // 0.3% of 60,000 => 180
+    expect(await vault.usdgAmounts(btc.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(180, 18)))
+    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub(300000))
   })
 
   it("sellUSDG", async () => {

@@ -33,7 +33,7 @@ contract Vault is ReentrancyGuard {
     uint256 public govUnlockTime;
 
     uint256 public liquidationFeeUsd;
-    uint256 public maxLeverage = 500000; // 50x
+    uint256 public maxLeverage = 20 * 10000; // 20x
     uint256 public priceSampleSpace = 3;
 
     // with the default settings, the funding rate will be 0.06% * utilisation ratio
@@ -42,8 +42,8 @@ contract Vault is ReentrancyGuard {
     uint256 public fundingInterval = 8 hours;
     uint256 public fundingRateFactor = 600;
 
-    uint256 public swapFeeBasisPoints = 20; // 0.2%
-    uint256 public marginFeeBasisPoints = 2; // 0.02%
+    uint256 public swapFeeBasisPoints = 30; // 0.3%
+    uint256 public marginFeeBasisPoints = 10; // 0.1%
 
     mapping (address => bool) public whitelistedTokens;
     mapping (address => address) public priceFeeds;
