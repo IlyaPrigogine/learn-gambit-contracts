@@ -3,6 +3,7 @@ const { solidity } = require("ethereum-waffle")
 const { deployContract } = require("../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../shared/utilities")
 const { toChainlinkPrice } = require("../shared/chainlink")
+const { toUsd } = require("../shared/usd")
 
 use(solidity)
 
@@ -15,6 +16,8 @@ describe("Vault", function () {
   let bnbPriceFeed
   let btc
   let btcPriceFeed
+  let dai
+  let daiPriceFeed
 
   beforeEach(async () => {
     vault = await deployContract("Vault", [])
@@ -26,6 +29,9 @@ describe("Vault", function () {
 
     btc = await deployContract("Token", [])
     btcPriceFeed = await deployContract("PriceFeed", [])
+
+    dai = await deployContract("Token", [])
+    daiPriceFeed = await deployContract("PriceFeed", [])
   })
 
   it("inits", async () => {
@@ -482,5 +488,124 @@ describe("Vault", function () {
     await usdg.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
     await expect(vault.sellUSDG(btc.address, user3.address))
       .to.be.revertedWith("Vault: invalid totalUsdgAmount")
+  })
+
+  it("increasePosition long validations", async () => {
+    await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
+    await vault.addWhitelistedToken(
+      dai.address, // _token
+      daiPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      18, // _tokenDecimals
+      true // _isStable
+    )
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, 0, true))
+      .to.be.revertedWith("Vault: invalid _size")
+    await expect(vault.connect(user0).increasePosition(btc.address, bnb.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: mismatched tokens")
+    await expect(vault.connect(user0).increasePosition(dai.address, dai.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: _collateralToken must not be a stableToken")
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: _collateralToken not whitelisted")
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
+    await vault.addWhitelistedToken(
+      btc.address, // _token
+      btcPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      8, // _tokenDecimals
+      false // _isStable
+    )
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: insufficient collateral for fees")
+
+    await btc.mint(user0.address, expandDecimals(1, 8))
+    await btc.connect(user0).transfer(vault.address, 2500 - 1)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: insufficient collateral for fees")
+
+    await btc.connect(user0).transfer(vault.address, 1)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: position should be liquidated")
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: remainingCollateral is zero")
+
+    await btc.connect(user0).transfer(vault.address, 1)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(1000), true))
+      .to.be.revertedWith("Vault: maxLeverage exceeded")
+
+    // 0.000025 BTC => 1 USD
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(48), true))
+      .to.be.revertedWith("Vault: maxLeverage exceeded")
+
+    await btc.connect(user0).transfer(vault.address, 10000)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true))
+      .to.be.revertedWith("Vault: insufficient collateral for liquidation fee")
+
+    await btc.connect(user0).transfer(vault.address, 200)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true))
+      .to.be.revertedWith("Vault: insufficient poolAmount")
+  })
+
+  it("increasePosition long", async () => {
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
+    await vault.addWhitelistedToken(
+      btc.address, // _token
+      btcPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      8, // _tokenDecimals
+      false // _isStable
+    )
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
+
+    await btc.mint(user0.address, expandDecimals(1, 8))
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+
+    await btc.connect(user0).transfer(vault.address, 117500 - 1)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true))
+      .to.be.revertedWith("Vault: insufficient poolAmount")
+
+    await vault.buyUSDG(btc.address, user1.address)
+
+    await btc.connect(user0).transfer(vault.address, 117500 - 1)
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true))
+      .to.be.revertedWith("Vault: insufficient poolAmount")
+
+    await vault.buyUSDG(btc.address, user1.address)
+
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true))
+      .to.be.revertedWith("Vault: insufficient collateral for fees")
+
+    await btc.connect(user0).transfer(vault.address, 10000 + 2500 + 200)
+
+    expect(await vault.reservedAmounts(btc.address)).eq(0)
+    expect(await vault.guaranteedUsd(btc.address)).eq(0)
+    await vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true)
+    expect(await vault.reservedAmounts(btc.address)).eq(117500)
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(47))
   })
 })
