@@ -146,6 +146,8 @@ contract Vault is ReentrancyGuard {
 
         _increaseUsdgAmount(_token, mintAmount);
         _increasePoolAmount(_token, amountAfterFees);
+
+        _updateTokenBalance(usdg);
     }
 
     function sellUSDG(address _token, address _receiver) external nonReentrant {
@@ -175,6 +177,8 @@ contract Vault is ReentrancyGuard {
         uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
         require(amountAfterFees > 0, "Vault: invalid amountAfterFees");
         _transferOut(_token, amountAfterFees, _receiver);
+
+        _updateTokenBalance(usdg);
     }
 
     function swap(address _tokenIn, address _tokenOut, address _receiver) external nonReentrant {
@@ -186,11 +190,20 @@ contract Vault is ReentrancyGuard {
         uint256 amountIn = _transferIn(_tokenIn);
         require(amountIn > 0, "Vault: invalid amountIn");
 
-        uint256 amountOut = getSwapAmountOut(_tokenIn, _tokenOut, amountIn);
+        uint256 priceIn = getMinPrice(_tokenIn);
+        uint256 priceOut = getMaxPrice(_tokenOut);
+
+        uint256 amountOut = amountIn.mul(priceIn).div(priceOut);
+        amountOut = adjustForDecimals(amountOut, _tokenIn, _tokenOut);
         uint256 amountAfterFees = _collectSwapFees(_tokenOut, amountOut);
 
-        _increaseUsdgAmount(_tokenIn, amountIn);
-        _decreaseUsdgAmount(_tokenOut, amountOut);
+        uint256 usdIn = amountIn.mul(priceIn).div(PRICE_PRECISION);
+        usdIn = adjustForDecimals(usdIn, _tokenIn, usdg);
+        uint256 usdOut = amountOut.mul(priceOut).div(PRICE_PRECISION);
+        usdOut = adjustForDecimals(usdOut, _tokenOut, usdg);
+
+        _increaseUsdgAmount(_tokenIn, usdIn);
+        _decreaseUsdgAmount(_tokenOut, usdOut);
 
         _increasePoolAmount(_tokenIn, amountIn);
         _decreasePoolAmount(_tokenOut, amountOut);
@@ -394,14 +407,6 @@ contract Vault is ReentrancyGuard {
         return basisPoints;
     }
 
-    function getSwapAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256) {
-        uint256 priceIn = getMinPrice(_tokenIn);
-        uint256 priceOut = getMaxPrice(_tokenOut);
-
-        uint256 amount = _amountIn.mul(priceIn).div(priceOut);
-        return adjustForDecimals(amount, _tokenIn, _tokenOut);
-    }
-
     function adjustForDecimals(uint256 _amount, address _tokenDiv, address _tokenMul) public view returns (uint256) {
         uint256 decimalsDiv = tokenDecimals[_tokenDiv];
         uint256 decimalsMul = tokenDecimals[_tokenMul];
@@ -588,6 +593,11 @@ contract Vault is ReentrancyGuard {
         uint256 nextBalance = IERC20(_token).balanceOf(address(this));
         require(nextBalance >= reservedAmounts[_token], "Vault: reserve limit exceeded");
 
+        tokenBalances[_token] = nextBalance;
+    }
+
+    function _updateTokenBalance(address _token) private {
+        uint256 nextBalance = IERC20(_token).balanceOf(address(this));
         tokenBalances[_token] = nextBalance;
     }
 
