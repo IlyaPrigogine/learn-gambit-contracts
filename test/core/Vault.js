@@ -40,7 +40,7 @@ describe("Vault", function () {
 
     expect(await vault.gov()).eq(wallet.address)
     expect(await vault.usdg()).eq(usdg.address)
-    expect(await vault.liquidationFeeUsd()).eq("5000000000000000000")
+    expect(await vault.liquidationFeeUsd()).eq(toUsd(5))
     expect(await vault.tokenDecimals(usdg.address)).eq(18)
   })
 
