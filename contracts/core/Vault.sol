@@ -448,6 +448,12 @@ contract Vault is ReentrancyGuard {
         return _usdAmount.mul(10 ** decimals).div(price);
     }
 
+    function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256, uint256, uint256, uint256) {
+        bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
+        Position memory position = positions[key];
+        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate);
+    }
+
     function getPositionKey(address _account, address _collateralToken, address _indexToken, bool _isLong) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(
             _account,
