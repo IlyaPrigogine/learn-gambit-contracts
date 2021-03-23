@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-waffle")
 require("@nomiclabs/hardhat-etherscan")
+require("hardhat-contract-sizer")
 
 const { BSC_URL, BSC_DEPLOY_KEY, BSCSCAN_API_KEY } = require("./env.json")
 
