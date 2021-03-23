@@ -272,7 +272,7 @@ contract Vault is ReentrancyGuard {
         }
     }
 
-    function decreasePosition(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong) external nonReentrant {
+    function decreasePosition(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external nonReentrant {
         require(_sizeDelta > 0, "Vault: invalid _sizeDelta");
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -331,8 +331,8 @@ contract Vault is ReentrancyGuard {
 
         if (usdOut > 0) {
             uint256 amountOut = usdToTokenMin(_collateralToken, usdOut);
-            _transferOut(_collateralToken, amountOut, msg.sender);
             _decreasePoolAmount(_collateralToken, amountOut);
+            _transferOut(_collateralToken, amountOut, _receiver);
         }
     }
 

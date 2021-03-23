@@ -652,13 +652,13 @@ describe("Vault", function () {
       18, // _tokenDecimals
       true // _isStable
     )
-    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, 0, true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, 0, true, user2.address))
       .to.be.revertedWith("Vault: invalid _sizeDelta")
-    await expect(vault.connect(user0).decreasePosition(btc.address, bnb.address, 0, toUsd(1000), true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, bnb.address, 0, toUsd(1000), true, user2.address))
       .to.be.revertedWith("Vault: mismatched tokens")
-    await expect(vault.connect(user0).decreasePosition(dai.address, dai.address, 0, toUsd(1000), true))
+    await expect(vault.connect(user0).decreasePosition(dai.address, dai.address, 0, toUsd(1000), true, user2.address))
       .to.be.revertedWith("Vault: _collateralToken must not be a stableToken")
-    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(1000), true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(1000), true, user2.address))
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
@@ -674,7 +674,7 @@ describe("Vault", function () {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
 
-    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(1000), true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(1000), true, user2.address))
       .to.be.revertedWith("Vault: empty position")
 
     await btc.mint(user1.address, expandDecimals(1, 8))
@@ -713,15 +713,34 @@ describe("Vault", function () {
     let leverage = await vault.getPositionLeverage(user0.address, btc.address, btc.address, true)
     expect(leverage).eq(90817) // ~9X leverage
 
-    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(100), true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(100), true, user2.address))
       .to.be.revertedWith("Vault: size exceeded")
 
-    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(10), toUsd(50), true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(10), toUsd(50), true, user2.address))
       .to.be.revertedWith("SafeMath: subtraction overflow")
 
-    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(5), toUsd(50), true))
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(5), toUsd(50), true, user2.address))
       .to.be.revertedWith("Vault: insufficient collateral for liquidation fee")
 
-    await vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(3), toUsd(50), true)
+    expect(await vault.feeReserves(btc.address)).eq(969)
+    expect(await vault.reservedAmounts(btc.address)).eq(225000)
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(90))
+    expect(await vault.poolAmounts(btc.address)).eq(274250)
+    expect(await btc.balanceOf(user2.address)).eq(0)
+
+    await vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(3), toUsd(50), true, user2.address)
+
+    position = await vault.getPosition(user0.address, btc.address, btc.address, true)
+    expect(position[0]).eq(toUsd(40)) // size
+    expect(position[1]).eq(toUsd(9.91 - 3)) // collateral
+    expect(position[2]).eq(toNormalizedPrice(41000)) // averagePrice
+    expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(225000 / 90 * 40) // reserveAmount, 0.00225 * 40,000 => 90
+
+    expect(await vault.feeReserves(btc.address)).eq(969 + 106) // 0.00000106 * 45100 => ~0.05 USD
+    expect(await vault.reservedAmounts(btc.address)).eq(225000 / 90 * 40)
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(40))
+    expect(await vault.poolAmounts(btc.address)).eq(274250 - 16878)
+    expect(await btc.balanceOf(user2.address)).eq(16878) // 0.00016878 * 47100 => 7.949538 USD
   })
 })
