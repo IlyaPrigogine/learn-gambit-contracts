@@ -41,7 +41,6 @@ describe("Vault", function () {
     expect(await vault.gov()).eq(wallet.address)
     expect(await vault.usdg()).eq(usdg.address)
     expect(await vault.liquidationFeeUsd()).eq(toUsd(5))
-    expect(await vault.tokenDecimals(usdg.address)).eq(18)
   })
 
   it("setGov", async () => {
@@ -486,6 +485,7 @@ describe("Vault", function () {
     expect(await bnb.balanceOf(user3.address)).eq(expandDecimals(200, 18).sub(expandDecimals(6, 17)))
 
     await usdg.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
+
     await expect(vault.sellUSDG(btc.address, user3.address))
       .to.be.revertedWith("Vault: invalid totalUsdgAmount")
   })
@@ -581,7 +581,7 @@ describe("Vault", function () {
     await btc.mint(user0.address, expandDecimals(1, 8))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
 
     await btc.connect(user0).transfer(vault.address, 117500 - 1)
@@ -600,7 +600,7 @@ describe("Vault", function () {
     expect(await vault.poolAmounts(btc.address)).eq(117500 - 1 - 353)
 
     await btc.connect(user0).transfer(vault.address, 117500 - 1)
-    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true))
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(100), true))
       .to.be.revertedWith("Vault: insufficient poolAmount")
 
     await vault.buyUSDG(btc.address, user1.address)
@@ -622,8 +622,10 @@ describe("Vault", function () {
     expect(position[1]).eq(0) // collateral
     expect(position[2]).eq(0) // averagePrice
     expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(0) // reserveAmount
 
-    await vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true)
+    const tx = await vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(47), true)
+    await reportGasUsed(provider, tx, "increasePosition gas used")
 
     expect(await vault.reservedAmounts(btc.address)).eq(117500)
     expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(47))
@@ -631,11 +633,95 @@ describe("Vault", function () {
     position = await vault.getPosition(user0.address, btc.address, btc.address, true)
     expect(position[0]).eq(toUsd(47)) // size
     expect(position[1]).eq(toUsd(5.033)) // collateral, 0.000127 BTC => 5.08, 5.08 - 0.047 => 5.033
-    expect(position[2]).eq(toNormalizedPrice(40000)) // averagePrice
+    expect(position[2]).eq(toNormalizedPrice(41000)) // averagePrice
     expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(117500) // reserveAmount
 
-    expect(await vault.feeReserves(btc.address)).eq(353 * 2 + 117) // fee is 0.047 USD => 0.00000117 BTC
+    expect(await vault.feeReserves(btc.address)).eq(353 * 2 + 114) // fee is 0.047 USD => 0.00000114 BTC
     expect(await vault.usdgAmounts(btc.address)).eq("93716800000000000000") // (117500 - 1 - 353) * 40000 * 2
-    expect(await vault.poolAmounts(btc.address)).eq((117500 - 1 - 353) * 2)
+    expect(await vault.poolAmounts(btc.address)).eq((117500 - 1 - 353) * 2 + 10000 + 2500 + 200)
+  })
+
+  it("decreasePosition long", async () => {
+    await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
+    await vault.addWhitelistedToken(
+      dai.address, // _token
+      daiPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      18, // _tokenDecimals
+      true // _isStable
+    )
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, 0, true))
+      .to.be.revertedWith("Vault: invalid _sizeDelta")
+    await expect(vault.connect(user0).decreasePosition(btc.address, bnb.address, 0, toUsd(1000), true))
+      .to.be.revertedWith("Vault: mismatched tokens")
+    await expect(vault.connect(user0).decreasePosition(dai.address, dai.address, 0, toUsd(1000), true))
+      .to.be.revertedWith("Vault: _collateralToken must not be a stableToken")
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(1000), true))
+      .to.be.revertedWith("Vault: _collateralToken not whitelisted")
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await vault.addWhitelistedToken(
+      btc.address, // _token
+      btcPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      9000, // _redemptionBps
+      8, // _tokenDecimals
+      false // _isStable
+    )
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(1000), true))
+      .to.be.revertedWith("Vault: empty position")
+
+    await btc.mint(user1.address, expandDecimals(1, 8))
+    await btc.connect(user1).transfer(vault.address, 250000) // 0.0025 BTC => 100 USD
+    await vault.buyUSDG(btc.address, user1.address)
+
+    await btc.mint(user0.address, expandDecimals(1, 8))
+    await btc.connect(user1).transfer(vault.address, 25000) // 0.00025 BTC => 10 USD
+    await expect(vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(110), true))
+      .to.be.revertedWith("Vault: insufficient poolAmount for reserve")
+
+    await vault.connect(user0).increasePosition(btc.address, btc.address, toUsd(90), true)
+
+    let position = await vault.getPosition(user0.address, btc.address, btc.address, true)
+    expect(position[0]).eq(toUsd(90)) // size
+    expect(position[1]).eq(toUsd(9.91)) // collateral, 10 - 90 * 0.1%
+    expect(position[2]).eq(toNormalizedPrice(41000)) // averagePrice
+    expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(225000) // reserveAmount, 0.00225 * 40,000 => 90
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(45100))
+    let delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(false)
+    expect(delta[1]).eq("2195121951219512195121951219512") // ~2.1951
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(46100))
+    delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(false)
+    expect(delta[1]).eq("2195121951219512195121951219512") // ~2.1951
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(47100))
+    delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(true)
+    expect(delta[1]).eq(toUsd(9))
+
+    let leverage = await vault.getPositionLeverage(user0.address, btc.address, btc.address, true)
+    expect(leverage).eq(90817) // ~9X leverage
+
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(100), true))
+      .to.be.revertedWith("Vault: size exceeded")
+
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(10), toUsd(50), true))
+      .to.be.revertedWith("SafeMath: subtraction overflow")
+
+    await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(5), toUsd(50), true))
+      .to.be.revertedWith("Vault: insufficient collateral for liquidation fee")
+
+    await vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(3), toUsd(50), true)
   })
 })
