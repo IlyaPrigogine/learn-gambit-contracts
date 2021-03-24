@@ -714,7 +714,7 @@ describe("Vault", function () {
     expect(leverage).eq(90817) // ~9X leverage
 
     await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, 0, toUsd(100), true, user2.address))
-      .to.be.revertedWith("Vault: size exceeded")
+      .to.be.revertedWith("SafeMath: subtraction overflow")
 
     await expect(vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(10), toUsd(50), true, user2.address))
       .to.be.revertedWith("SafeMath: subtraction overflow")
@@ -728,7 +728,8 @@ describe("Vault", function () {
     expect(await vault.poolAmounts(btc.address)).eq(274250)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
-    await vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(3), toUsd(50), true, user2.address)
+    const tx = await vault.connect(user0).decreasePosition(btc.address, btc.address, toUsd(3), toUsd(50), true, user2.address)
+    await reportGasUsed(provider, tx, "decreasePosition gas used")
 
     position = await vault.getPosition(user0.address, btc.address, btc.address, true)
     expect(position[0]).eq(toUsd(40)) // size
@@ -740,7 +741,7 @@ describe("Vault", function () {
     expect(await vault.feeReserves(btc.address)).eq(969 + 106) // 0.00000106 * 45100 => ~0.05 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 / 90 * 40)
     expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(40))
-    expect(await vault.poolAmounts(btc.address)).eq(274250 - 16878)
+    expect(await vault.poolAmounts(btc.address)).eq(274250 - 16878 - 106 - 1)
     expect(await btc.balanceOf(user2.address)).eq(16878) // 0.00016878 * 47100 => 7.949538 USD
   })
 })

@@ -277,18 +277,22 @@ contract Vault is ReentrancyGuard {
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
 
+        Position storage position;
+        {
         bytes32 key = getPositionKey(msg.sender, _collateralToken, _indexToken, _isLong);
-        Position storage position = positions[key];
+        position = positions[key];
+        }
         require(position.size > 0, "Vault: empty position");
 
-        uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
-
+        uint256 usdOut;
+        uint256 usdOutAfterFee;
+        {
         (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
+        uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
         // get the proportional change in PnL
         uint256 adjustedDelta = _sizeDelta.mul(delta).div(position.size);
-        uint256 usdOut;
 
-        // transfer profits outs
+        // transfer profits out
         if (hasProfit) {
             usdOut = adjustedDelta;
         }
@@ -309,30 +313,35 @@ contract Vault is ReentrancyGuard {
 
         // if the usdOut is more than the fee then deduct the fee from the usdOut directly
         // else deduct the fee from the position's collateral
+        usdOutAfterFee = usdOut;
         if (usdOut > fee) {
-            usdOut = usdOut.sub(fee);
+            usdOutAfterFee = usdOut.sub(fee);
         } else {
             position.collateral = position.collateral.sub(fee);
         }
+        }
 
+        {
         uint256 reserveDelta = position.reserveAmount.mul(_sizeDelta).div(position.size);
+        position.reserveAmount = position.reserveAmount.sub(reserveDelta);
+        _decreaseReservedAmount(_collateralToken, reserveDelta);
+        }
 
         position.entryFundingRate = cumulativeFundingRates[_collateralToken];
         position.size = position.size.sub(_sizeDelta, "Vault: size exceeded");
 
+        {
+        (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
         _validatePosition(position.size, position.collateral, hasProfit, delta);
-
-        position.reserveAmount = position.reserveAmount.sub(reserveDelta);
-        _decreaseReservedAmount(_collateralToken, reserveDelta);
+        }
 
         if (_isLong) {
             _decreaseGuaranteedUsd(_indexToken, _sizeDelta);
         }
 
         if (usdOut > 0) {
-            uint256 amountOut = usdToTokenMin(_collateralToken, usdOut);
-            _decreasePoolAmount(_collateralToken, amountOut);
-            _transferOut(_collateralToken, amountOut, _receiver);
+            _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, usdOut));
+            _transferOut(_collateralToken, usdToTokenMin(_collateralToken, usdOutAfterFee), _receiver);
         }
     }
 
