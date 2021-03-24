@@ -268,10 +268,8 @@ contract Vault is ReentrancyGuard {
         position.size = position.size.add(_sizeDelta);
 
         require(position.size > 0, "Vault: invalid position.size");
-        _validatePosition(_indexToken, position.size, position.collateral, position.averagePrice, _isLong);
-
-        (bool _shouldLiquidate,) = shouldLiquidate(_account, _collateralToken, _indexToken, _isLong);
-        require(!_shouldLiquidate, "Vault: invalid position");
+        _validatePosition(position.size, position.collateral);
+        validateLiquidation(_account, _collateralToken, _indexToken, _isLong, true);
 
         // reserve tokens to pay the profits on the position
         uint256 reserveDelta = usdToTokenMax(_collateralToken, _sizeDelta);
@@ -303,10 +301,8 @@ contract Vault is ReentrancyGuard {
             position.entryFundingRate = cumulativeFundingRates[_collateralToken];
             position.size = position.size.sub(_sizeDelta);
 
-            _validatePosition(_indexToken, position.size, position.collateral, position.averagePrice, _isLong);
-
-            (bool _shouldLiquidate,) = shouldLiquidate(_account, _collateralToken, _indexToken, _isLong);
-            require(!_shouldLiquidate, "Vault: invalid position");
+            _validatePosition(position.size, position.collateral);
+            validateLiquidation(_account, _collateralToken, _indexToken, _isLong, true);
         } else {
             delete positions[key];
         }
@@ -326,10 +322,10 @@ contract Vault is ReentrancyGuard {
         updateCumulativeFundingRate(_collateralToken);
 
         bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
-        Position storage position = positions[key];
+        Position memory position = positions[key];
         require(position.size > 0, "Vault: empty position");
 
-        (bool _shouldLiquidate, uint256 marginFees) = shouldLiquidate(_account, _collateralToken, _indexToken, _isLong);
+        (bool _shouldLiquidate, uint256 marginFees) = validateLiquidation(_account, _collateralToken, _indexToken, _isLong, false);
         require(_shouldLiquidate, "Vault: position cannot be liquidated");
 
         feeReserves[_collateralToken] = feeReserves[_collateralToken].add(usdToTokenMin(_collateralToken, marginFees));
@@ -347,30 +343,43 @@ contract Vault is ReentrancyGuard {
         _transferOut(_collateralToken, usdToTokenMin(_collateralToken, liquidationFeeUsd), _feeReceiver);
     }
 
-    function shouldLiquidate(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (bool, uint256) {
+    function validateLiquidation(address _account, address _collateralToken, address _indexToken, bool _isLong, bool _raise) public view returns (bool, uint256) {
         bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
-        Position storage position = positions[key];
-
-        if (position.size == 0) { return (false, 0); }
+        Position memory position = positions[key];
 
         (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
         uint256 marginFees = getFundingFee(_collateralToken, position.size, position.entryFundingRate);
         marginFees = marginFees.add(getPositionFee(position.size));
 
-        if (hasProfit && position.collateral.add(delta) >= marginFees.add(liquidationFeeUsd)) {
-            return (false, marginFees);
+        if (!hasProfit && position.collateral < delta) {
+            if (_raise) { revert("Vault: losses exceed collateral"); }
+            return (true, marginFees);
         }
 
-        if (!hasProfit && position.collateral >= delta.add(marginFees).add(liquidationFeeUsd)) {
-            return (false, marginFees);
+        uint256 remainingCollateral = position.collateral;
+        if (!hasProfit) {
+            remainingCollateral = position.collateral.sub(delta);
+        } else {
+            remainingCollateral = position.collateral.add(delta);
         }
 
-        // cap the marginFees to the position's collateral
-        if (marginFees > position.collateral) {
-            marginFees = position.collateral;
+        if (remainingCollateral < marginFees) {
+            if (_raise) { revert("Vault: fees exceed collateral"); }
+            // cap the fees to the remainingCollateral
+            return (true, remainingCollateral);
         }
 
-        return (true, marginFees);
+        if (remainingCollateral < marginFees.add(liquidationFeeUsd)) {
+            if (_raise) { revert("Vault: liquidation fees exceed collateral"); }
+            return (true, marginFees);
+        }
+
+        if (remainingCollateral.mul(maxLeverage) < position.size.mul(BASIS_POINTS_DIVISOR)) {
+            if (_raise) { revert("Vault: maxLeverage exceeded"); }
+            return (true, marginFees);
+        }
+
+        return (false, marginFees);
     }
 
     function getMaxPrice(address _token) public view returns (uint256) {
@@ -619,27 +628,12 @@ contract Vault is ReentrancyGuard {
         return (usdOut, usdOutAfterFee);
     }
 
-    function _validatePosition(address _indexToken, uint256 _size, uint256 _collateral, uint256 _averagePrice, bool _isLong) private view {
-        (bool hasProfit, uint256 delta) = getDelta(_indexToken, _size, _averagePrice, _isLong);
+    function _validatePosition(uint256 _size, uint256 _collateral) private pure {
         if (_size == 0) {
             require(_collateral == 0, "Vault: collateral should be withdrawn");
             return;
         }
-
-        if (!hasProfit && delta > _collateral) {
-            revert("Vault: position should be liquidated");
-        }
-
-        uint256 remainingCollateral = hasProfit ? _collateral.add(delta) : _collateral.sub(delta);
-        require(remainingCollateral > 0, "Vault: empty remainingCollateral");
-        require(_size.mul(BASIS_POINTS_DIVISOR) <= remainingCollateral.mul(maxLeverage), "Vault: maxLeverage exceeded");
-
-        // a position's collateral is stored as a USD value but
-        // received collateral tokens are not converted to stable tokens
-        // if the _size of the position is lower than the _collateral and the price of the collateral token drops
-        // then the system might not have sufficient funds to pay for collateral withdrawals
         require(_size > _collateral, "Vault: _size must be more than _collateral");
-        require(_collateral > liquidationFeeUsd.add(getPositionFee(_size)), "Vault: insufficient collateral for liquidation fee");
     }
 
     function _validateRouter(address _account) private view {
