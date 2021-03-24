@@ -365,18 +365,24 @@ contract Vault is ReentrancyGuard {
     }
 
     function getRedemptionAmount(address _token, uint256 _usdgAmount) public view returns (uint256) {
-        uint256 tokenBalance = usdToTokenMin(_token, guaranteedUsd[_token]);
-        tokenBalance = tokenBalance.add(poolAmounts[_token]);
-        tokenBalance = tokenBalance.sub(reservedAmounts[_token]);
-
         uint256 basisPoints = getRedemptionBasisPoints(_token);
         uint256 totalUsdgAmount = usdgAmounts[_token];
         require(totalUsdgAmount > 0, "Vault: invalid totalUsdgAmount");
 
-        uint256 redemptionAmount = _usdgAmount.mul(tokenBalance).div(totalUsdgAmount);
+        uint256 redemptionCollateral = getRedemptionCollateral(_token);
+        uint256 redemptionAmount = _usdgAmount.mul(redemptionCollateral).div(totalUsdgAmount);
         redemptionAmount = redemptionAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
 
         return adjustForDecimals(redemptionAmount, usdg, _token);
+    }
+
+    function getRedemptionCollateral(address _token) public view returns (uint256) {
+        uint256 collateral = usdToTokenMin(_token, guaranteedUsd[_token]);
+        return collateral.add(poolAmounts[_token]).sub(reservedAmounts[_token]);
+    }
+
+    function getRedemptionCollateralUsd(address _token) public view returns (uint256) {
+        return tokenToUsdMin(_token, getRedemptionCollateral(_token));
     }
 
     function getRedemptionBasisPoints(address _token) public view returns (uint256) {

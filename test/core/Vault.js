@@ -586,7 +586,7 @@ describe("Vault", function () {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
 
-    await btc.connect(user0).transfer(vault.address, 117500 - 1)
+    await btc.connect(user0).transfer(vault.address, 117500 - 1) // 0.001174 BTC => 47
 
     await expect(vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(47), true))
       .to.be.revertedWith("Vault: insufficient poolAmount")
@@ -595,7 +595,9 @@ describe("Vault", function () {
     expect(await vault.usdgAmounts(btc.address)).eq(0)
     expect(await vault.poolAmounts(btc.address)).eq(0)
 
+    expect(await vault.getRedemptionCollateralUsd(btc.address)).eq(0)
     await vault.buyUSDG(btc.address, user1.address)
+    expect(await vault.getRedemptionCollateralUsd(btc.address)).eq(toUsd("46.8584"))
 
     expect(await vault.feeReserves(btc.address)).eq(353) // (117500 - 1) * 0.3% => 353
     expect(await vault.usdgAmounts(btc.address)).eq("46858400000000000000") // (117500 - 1 - 353) * 40000
@@ -606,6 +608,8 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: insufficient poolAmount")
 
     await vault.buyUSDG(btc.address, user1.address)
+
+    expect(await vault.getRedemptionCollateralUsd(btc.address)).eq(toUsd("93.7168"))
 
     expect(await vault.feeReserves(btc.address)).eq(353 * 2) // (117500 - 1) * 0.3% * 2
     expect(await vault.usdgAmounts(btc.address)).eq("93716800000000000000") // (117500 - 1 - 353) * 40000 * 2
@@ -629,8 +633,10 @@ describe("Vault", function () {
     const tx = await vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(47), true)
     await reportGasUsed(provider, tx, "increasePosition gas used")
 
+    expect(await vault.poolAmounts(btc.address)).eq(246992)
     expect(await vault.reservedAmounts(btc.address)).eq(117500)
     expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(47))
+    expect(await vault.getRedemptionCollateralUsd(btc.address)).eq(toUsd(97.6504)) // (246992 - 117500) sats * 40000 => 51.7968, 47 / 40000 * 41000 => ~45.8536
 
     position = await vault.getPosition(user0.address, btc.address, btc.address, true)
     expect(position[0]).eq(toUsd(47)) // size
