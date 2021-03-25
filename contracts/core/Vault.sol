@@ -177,23 +177,14 @@ contract Vault is ReentrancyGuard {
 
         updateCumulativeFundingRate(_token);
 
-        uint256 price = getMaxPrice(_token);
-
-        uint256 tokenAmount = usdgAmount.mul(PRICE_PRECISION).div(price);
-        // cap the redemption amount for non-stable tokens
-        if (!stableTokens[_token]) {
-            uint256 redemptionAmount = getRedemptionAmount(_token, usdgAmount);
-            if (tokenAmount > redemptionAmount) {
-                tokenAmount = redemptionAmount;
-            }
-        }
+        uint256 redemptionAmount = getRedemptionAmount(_token, usdgAmount);
 
         _decreaseUsdgAmount(_token, usdgAmount);
-        _decreasePoolAmount(_token, tokenAmount);
+        _decreasePoolAmount(_token, redemptionAmount);
 
         IUSDG(usdg).burn(address(this), usdgAmount);
 
-        uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
+        uint256 amountAfterFees = _collectSwapFees(_token, redemptionAmount);
         require(amountAfterFees > 0, "Vault: invalid amountAfterFees");
         _transferOut(_token, amountAfterFees, _receiver);
 
@@ -336,6 +327,11 @@ contract Vault is ReentrancyGuard {
 
         delete positions[key];
 
+        if (!_isLong && marginFees < position.collateral) {
+            uint256 remainingCollateral = position.collateral.sub(marginFees);
+            _increasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, remainingCollateral));
+        }
+
         // pay the fee receiver using the pool, we assume that in general the liquidated amount should be sufficient to cover
         // the liquidation fees
         _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, liquidationFeeUsd));
@@ -426,15 +422,32 @@ contract Vault is ReentrancyGuard {
     }
 
     function getRedemptionAmount(address _token, uint256 _usdgAmount) public view returns (uint256) {
-        uint256 basisPoints = getRedemptionBasisPoints(_token);
-        uint256 totalUsdgAmount = usdgAmounts[_token];
-        require(totalUsdgAmount > 0, "Vault: invalid totalUsdgAmount");
+        uint256 price = getMaxPrice(_token);
+        // calculate the price based redemption amount
+        uint256 redemptionAmount = _usdgAmount.mul(PRICE_PRECISION).div(price);
+
+        if (stableTokens[_token]) {
+            return redemptionAmount;
+        }
 
         uint256 redemptionCollateral = getRedemptionCollateral(_token);
-        uint256 redemptionAmount = _usdgAmount.mul(redemptionCollateral).div(totalUsdgAmount);
-        redemptionAmount = redemptionAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
+        require(redemptionCollateral > 0, "Vault: empty collateral");
 
-        return adjustForDecimals(redemptionAmount, usdg, _token);
+        uint256 totalUsdgAmount = usdgAmounts[_token];
+
+        // if there is no USDG debt then the redemption amount based just on price can be supported
+        if (totalUsdgAmount == 0) {
+            return redemptionAmount;
+        }
+
+        // calculate the cappedAmount based on the amount of backing collateral and the
+        // total debt in USDG tokens for the asset
+        uint256 cappedAmount = _usdgAmount.mul(redemptionCollateral).div(totalUsdgAmount);
+        uint256 basisPoints = getRedemptionBasisPoints(_token);
+        cappedAmount = cappedAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
+        cappedAmount = adjustForDecimals(cappedAmount, usdg, _token);
+
+        return cappedAmount < redemptionAmount ? cappedAmount : redemptionAmount;
     }
 
     function getRedemptionCollateral(address _token) public view returns (uint256) {
@@ -709,8 +722,8 @@ contract Vault is ReentrancyGuard {
     }
 
     function _decreasePoolAmount(address _token, uint256 _amount) private {
-        poolAmounts[_token] = poolAmounts[_token].sub(_amount);
-        require(reservedAmounts[_token] <= poolAmounts[_token], "Vault: insufficient poolAmount");
+        poolAmounts[_token] = poolAmounts[_token].sub(_amount, "Vault: poolAmount exceeded");
+        require(reservedAmounts[_token] <= poolAmounts[_token], "Vault: reserve exceeds pool");
     }
 
     function _increaseUsdgAmount(address _token, uint256 _amount) private {
@@ -719,6 +732,9 @@ contract Vault is ReentrancyGuard {
 
     function _decreaseUsdgAmount(address _token, uint256 _amount) private {
         uint256 value = usdgAmounts[_token];
+        // since USDG can be minted using multiple assets
+        // it is possible for the USDG debt for a single asset to be less than zero
+        // the USDG debt is capped to zero for this case
         if (value <= _amount) {
             usdgAmounts[_token] = 0;
             return;
@@ -728,16 +744,11 @@ contract Vault is ReentrancyGuard {
 
     function _increaseReservedAmount(address _token, uint256 _amount) private {
         reservedAmounts[_token] = reservedAmounts[_token].add(_amount);
-        require(reservedAmounts[_token] <= poolAmounts[_token], "Vault: insufficient poolAmount for reserve");
+        require(reservedAmounts[_token] <= poolAmounts[_token], "Vault: reserve exceeds pool");
     }
 
     function _decreaseReservedAmount(address _token, uint256 _amount) private {
-        uint256 value = reservedAmounts[_token];
-        if (value <= _amount) {
-            reservedAmounts[_token] = 0;
-            return;
-        }
-        reservedAmounts[_token] = value.sub(_amount);
+        reservedAmounts[_token] = reservedAmounts[_token].sub(_amount, "Vault: insufficient reserve");
     }
 
     function _increaseGuaranteedUsd(address _token, uint256 _usdAmount) private {
@@ -745,11 +756,6 @@ contract Vault is ReentrancyGuard {
     }
 
     function _decreaseGuaranteedUsd(address _token, uint256 _usdAmount) private {
-        uint256 value = guaranteedUsd[_token];
-        if (value <= _usdAmount) {
-            guaranteedUsd[_token] = 0;
-            return;
-        }
-        guaranteedUsd[_token] = value.sub(_usdAmount);
+        guaranteedUsd[_token] = guaranteedUsd[_token].sub(_usdAmount);
     }
 }
