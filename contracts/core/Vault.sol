@@ -257,9 +257,6 @@ contract Vault is ReentrancyGuard {
         uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
         uint256 collateralDelta = _transferIn(_collateralToken);
 
-        // treat the deposited collateral as part of the pool
-        _increasePoolAmount(_collateralToken, collateralDelta);
-
         position.collateral = position.collateral.add(tokenToUsdMin(_collateralToken, collateralDelta));
         require(position.collateral >= fee, "Vault: insufficient collateral for fees");
 
@@ -278,6 +275,8 @@ contract Vault is ReentrancyGuard {
 
         if (_isLong) {
             _increaseGuaranteedUsd(_collateralToken, _sizeDelta);
+            // treat the deposited collateral as part of the pool
+            _increasePoolAmount(_collateralToken, collateralDelta);
         }
     }
 
@@ -596,11 +595,16 @@ contract Vault is ReentrancyGuard {
             usdOut = adjustedDelta;
         }
 
-        // deduct realised losses from the position's collateral
-        // _increasePoolAmount is not called here as it was already called in increasePosition
-        // the collateral is treated as part of the token pool
         if (!hasProfit && adjustedDelta > 0) {
             position.collateral = position.collateral.sub(adjustedDelta);
+
+            // transfer realised losses to the pool for short positions
+            // realised losses for long positions are not transferred here as
+            // _increasePoolAmount was already called in increasePosition for longs
+            if (!_isLong) {
+                uint256 tokenAmount = usdToTokenMin(_collateralToken, adjustedDelta);
+                _increasePoolAmount(_collateralToken, tokenAmount);
+            }
         }
 
         // reduce the position's collateral by _collateralDelta
@@ -633,7 +637,7 @@ contract Vault is ReentrancyGuard {
             require(_collateral == 0, "Vault: collateral should be withdrawn");
             return;
         }
-        require(_size > _collateral, "Vault: _size must be more than _collateral");
+        require(_size >= _collateral, "Vault: _size must be more than _collateral");
     }
 
     function _validateRouter(address _account) private view {
