@@ -358,8 +358,6 @@ contract Vault is ReentrancyGuard {
         uint256 remainingCollateral = position.collateral;
         if (!hasProfit) {
             remainingCollateral = position.collateral.sub(delta);
-        } else {
-            remainingCollateral = position.collateral.add(delta);
         }
 
         if (remainingCollateral < marginFees) {
@@ -544,6 +542,7 @@ contract Vault is ReentrancyGuard {
     function getPositionLeverage(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256) {
         bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
         Position memory position = positions[key];
+        require(position.collateral > 0, "Vault: invalid position");
         return position.size.mul(BASIS_POINTS_DIVISOR).div(position.collateral);
     }
 
@@ -554,6 +553,7 @@ contract Vault is ReentrancyGuard {
     }
 
     function getDelta(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong) public view returns (bool, uint256) {
+        require(_averagePrice > 0, "Vault: invalid _averagePrice");
         uint256 price = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
         uint256 priceDelta = _averagePrice > price ? _averagePrice.sub(price) : price.sub(_averagePrice);
         uint256 sizeDelta = _size.mul(priceDelta).div(_averagePrice);
