@@ -9,10 +9,12 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 
-import "./interfaces/IUSDG.sol";
 import "../oracle/interfaces/IPriceFeed.sol";
 
-contract Vault is ReentrancyGuard {
+import "./interfaces/IUSDG.sol";
+import "./interfaces/IVault.sol";
+
+contract Vault is ReentrancyGuard, IVault {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -148,7 +150,7 @@ contract Vault is ReentrancyGuard {
         delete stableTokens[_token];
     }
 
-    function buyUSDG(address _token, address _receiver) external nonReentrant {
+    function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
 
         uint256 tokenAmount = _transferIn(_token);
@@ -167,9 +169,11 @@ contract Vault is ReentrancyGuard {
 
         _increaseUsdgAmount(_token, mintAmount);
         _increasePoolAmount(_token, amountAfterFees);
+
+        return mintAmount;
     }
 
-    function sellUSDG(address _token, address _receiver) external nonReentrant {
+    function sellUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
 
         uint256 usdgAmount = _transferIn(usdg);
@@ -193,9 +197,11 @@ contract Vault is ReentrancyGuard {
         // however, for usdg, the tokens are burnt, so _updateTokenBalance should
         // be manually called to record the decrease in tokens
         _updateTokenBalance(usdg);
+
+        return amountAfterFees;
     }
 
-    function swap(address _tokenIn, address _tokenOut, address _receiver) external nonReentrant {
+    function swap(address _tokenIn, address _tokenOut, address _receiver) external override nonReentrant returns (uint256) {
         require(whitelistedTokens[_tokenIn], "Vault: _tokenIn not whitelisted");
         require(whitelistedTokens[_tokenOut], "Vault: _tokenOut not whitelisted");
         updateCumulativeFundingRate(_tokenIn);
@@ -223,6 +229,8 @@ contract Vault is ReentrancyGuard {
         _decreasePoolAmount(_tokenOut, amountOut);
 
         _transferOut(_tokenOut, amountAfterFees, _receiver);
+
+        return amountAfterFees;
     }
 
     function increasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external nonReentrant {
