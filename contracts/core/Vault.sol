@@ -440,6 +440,9 @@ contract Vault is ReentrancyGuard {
     }
 
     function getRedemptionCollateral(address _token) public view returns (uint256) {
+        if (stableTokens[_token]) {
+            return poolAmounts[_token];
+        }
         uint256 collateral = usdToTokenMin(_token, guaranteedUsd[_token]);
         return collateral.add(poolAmounts[_token]).sub(reservedAmounts[_token]);
     }
