@@ -233,7 +233,7 @@ contract Vault is ReentrancyGuard, IVault {
         return amountAfterFees;
     }
 
-    function increasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external nonReentrant {
+    function increasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external override nonReentrant {
         _validateRouter(_account);
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -279,7 +279,7 @@ contract Vault is ReentrancyGuard, IVault {
         }
     }
 
-    function decreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external nonReentrant {
+    function decreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external override nonReentrant returns (uint256) {
         _validateRouter(_account);
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -310,9 +310,13 @@ contract Vault is ReentrancyGuard, IVault {
         }
 
         if (usdOut > 0) {
-            _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, usdOut));
+            uint256 amountOut = usdToTokenMin(_collateralToken, usdOut);
+            _decreasePoolAmount(_collateralToken, amountOut);
             _transferOut(_collateralToken, usdToTokenMin(_collateralToken, usdOutAfterFee), _receiver);
+            return amountOut;
         }
+
+        return 0;
     }
 
     function liquidatePosition(address _account, address _collateralToken, address _indexToken, bool _isLong, address _feeReceiver) external nonReentrant {
@@ -383,11 +387,11 @@ contract Vault is ReentrancyGuard, IVault {
         return (false, marginFees);
     }
 
-    function getMaxPrice(address _token) public view returns (uint256) {
+    function getMaxPrice(address _token) public override view returns (uint256) {
         return getPrice(_token, true);
     }
 
-    function getMinPrice(address _token) public view returns (uint256) {
+    function getMinPrice(address _token) public override view returns (uint256) {
         return getPrice(_token, false);
     }
 
