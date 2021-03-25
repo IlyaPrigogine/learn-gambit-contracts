@@ -43,7 +43,6 @@ contract Router {
         bool isLong;
         address receiver;
         uint256 price;
-        uint256 stopPrice;
         uint256 relayerFee;
     }
 
@@ -123,7 +122,7 @@ contract Router {
         delete increasePositionOrders[_id];
     }
 
-    function storeDecreasePosition(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver, uint256 _price, uint256 _stopPrice, uint256 _nonce, uint256 _relayerFee) external payable {
+    function storeDecreasePosition(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver, uint256 _price, uint256 _nonce, uint256 _relayerFee) external payable {
         bytes32 id = getId(_sender(), _nonce);
         decreasePositionOrders[id] = DecreasePositionOrder(
             _sender(),
@@ -134,17 +133,12 @@ contract Router {
             _isLong,
             _receiver,
             _price,
-            _stopPrice,
             _relayerFee
         );
     }
 
     function execDecreasePosition(bytes32 _id) external {
         DecreasePositionOrder memory order = decreasePositionOrders[_id];
-        if (order.stopPrice != 0) {
-
-        }
-
         uint256 amountOut = _decreasePosition(order.collateralToken, order.indexToken, order.collateralDelta, order.sizeDelta, order.isLong, address(this), order.price);
         if (amountOut > order.relayerFee) {
             IERC20(order.collateralToken).safeTransfer(msg.sender, order.relayerFee);
