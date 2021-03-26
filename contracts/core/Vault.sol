@@ -395,6 +395,26 @@ contract Vault is ReentrancyGuard, IVault {
         return getPrice(_token, false);
     }
 
+    function getSinglePrice(address _token) public override view returns (uint256) {
+        address priceFeedAddress = priceFeeds[_token];
+        require(priceFeedAddress != address(0), "Vault: invalid price feed");
+        return uint256(IPriceFeed(priceFeedAddress).latestAnswer());
+    }
+
+    function getRoundId(address _token) public override view returns (uint256) {
+        address priceFeedAddress = priceFeeds[_token];
+        require(priceFeedAddress != address(0), "Vault: invalid price feed");
+        return uint256(IPriceFeed(priceFeedAddress).latestRound());
+    }
+
+    function getRoundPrice(address _token, uint256 _roundId) public override view returns (uint256) {
+        address priceFeedAddress = priceFeeds[_token];
+        require(priceFeedAddress != address(0), "Vault: invalid price feed");
+        require(_roundId < type(uint80).max, "Vault: invalid _roundId");
+        (, int256 p, , ,) = IPriceFeed(priceFeedAddress).getRoundData(uint80(_roundId));
+        return uint256(p);
+    }
+
     function getPrice(address _token, bool _maximise) public view returns (uint256) {
         address priceFeedAddress = priceFeeds[_token];
         require(priceFeedAddress != address(0), "Vault: invalid price feed");

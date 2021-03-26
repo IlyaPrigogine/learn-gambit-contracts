@@ -14,6 +14,8 @@ contract Router {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
+    enum TriggerType { None, AboveTriggerPrice, BelowTriggerPrice, Trailing }
+
     struct SwapOrder {
         address account;
         address[] path;
@@ -44,6 +46,9 @@ contract Router {
         address receiver;
         uint256 price;
         uint256 relayerFee;
+        TriggerType triggerType;
+        uint256 triggerPrice;
+        uint256 roundId;
     }
 
     // wrapped BNB / ETH
@@ -63,7 +68,14 @@ contract Router {
 
     receive() external payable {}
 
-    function storeSwap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver, uint256 _nonce, uint256 _relayerFee) external {
+    function storeSwap(
+        address[] memory _path,
+        uint256 _amountIn,
+        uint256 _minOut,
+        address _receiver,
+        uint256 _nonce,
+        uint256 _relayerFee
+    ) external {
         bytes32 id = getId(_sender(), _nonce);
         swapOrders[id] = SwapOrder(
             _sender(),
@@ -90,7 +102,16 @@ contract Router {
         delete swapOrders[_id];
     }
 
-    function storeIncreasePosition(address[] memory _path, address _indexToken, uint256 _amountIn, uint256 _sizeDelta, bool _isLong, uint256 _price, uint256 _nonce, uint256 _relayerFee) external payable {
+    function storeIncreasePosition(
+        address[] memory _path,
+        address _indexToken,
+        uint256 _amountIn,
+        uint256 _sizeDelta,
+        bool _isLong,
+        uint256 _price,
+        uint256 _nonce,
+        uint256 _relayerFee
+    ) external payable {
         bytes32 id = getId(_sender(), _nonce);
         increasePositionOrders[id] = IncreasePositionOrder(
             _sender(),
@@ -122,7 +143,19 @@ contract Router {
         delete increasePositionOrders[_id];
     }
 
-    function storeDecreasePosition(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver, uint256 _price, uint256 _nonce, uint256 _relayerFee) external payable {
+    function storeDecreasePosition(
+        address _collateralToken,
+        address _indexToken,
+        uint256 _collateralDelta,
+        uint256 _sizeDelta,
+        bool _isLong,
+        address _receiver,
+        uint256 _price,
+        uint256 _nonce,
+        uint256 _relayerFee,
+        TriggerType _triggerType,
+        uint256 _triggerPrice
+    ) external payable {
         bytes32 id = getId(_sender(), _nonce);
         decreasePositionOrders[id] = DecreasePositionOrder(
             _sender(),
@@ -133,12 +166,34 @@ contract Router {
             _isLong,
             _receiver,
             _price,
-            _relayerFee
+            _relayerFee,
+            _triggerType,
+            _triggerPrice,
+            IVault(vault).getRoundId(_indexToken)
         );
     }
 
-    function execDecreasePosition(bytes32 _id) external {
+    function execDecreasePosition(bytes32 _id, uint256 _trailingRoundId) external {
         DecreasePositionOrder memory order = decreasePositionOrders[_id];
+        uint256 price = IVault(vault).getSinglePrice(order.indexToken);
+
+        if (order.triggerType == TriggerType.AboveTriggerPrice) {
+            require(price > order.triggerPrice, "Router: mark price not above trigger price");
+        }
+        if (order.triggerType == TriggerType.BelowTriggerPrice) {
+            require(price < order.triggerPrice, "Router: mark price not below trigger price");
+        }
+        if (order.triggerType == TriggerType.Trailing) {
+            require(_trailingRoundId > order.roundId, "Router: invalid _trailingRoundId");
+            uint256 trailingPrice = IVault(vault).getRoundPrice(order.indexToken, _trailingRoundId);
+
+            if (order.isLong) {
+                require(trailingPrice.sub(order.triggerPrice) > price, "Router: invalid trail gap");
+            } else {
+                require(trailingPrice.add(order.triggerPrice) > price, "Router: invalid trail gap");
+            }
+        }
+
         uint256 amountOut = _decreasePosition(order.collateralToken, order.indexToken, order.collateralDelta, order.sizeDelta, order.isLong, address(this), order.price);
         if (amountOut > order.relayerFee) {
             IERC20(order.collateralToken).safeTransfer(msg.sender, order.relayerFee);
