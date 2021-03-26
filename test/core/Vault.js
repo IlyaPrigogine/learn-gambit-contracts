@@ -744,6 +744,8 @@ describe("Vault", function () {
     expect(position[2]).eq(toNormalizedPrice(41000)) // averagePrice
     expect(position[3]).eq(0) // entryFundingRate
     expect(position[4]).eq(225000 / 90 * 40) // reserveAmount, 0.00225 * 40,000 => 90
+    expect(position[5]).eq(toUsd(5)) // pnl
+    expect(position[6]).eq(true)
 
     expect(await vault.feeReserves(btc.address)).eq(969 + 106) // 0.00000106 * 45100 => ~0.05 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 / 90 * 40)
@@ -1075,6 +1077,8 @@ describe("Vault", function () {
     expect(position[2]).eq(toNormalizedPrice(40000)) // averagePrice
     expect(position[3]).eq(0) // entryFundingRate
     expect(position[4]).eq(expandDecimals(90, 18)) // reserveAmount
+    expect(position[5]).eq(0) // pnl
+    expect(position[6]).eq(true) // hasRealisedProfit
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(44000))
     let delta = await vault.getPositionDelta(user0.address, dai.address, btc.address, false)
@@ -1119,6 +1123,8 @@ describe("Vault", function () {
     expect(position[2]).eq(toNormalizedPrice(40000)) // averagePrice
     expect(position[3]).eq(0) // entryFundingRate
     expect(position[4]).eq(expandDecimals(40, 18)) // reserveAmount
+    expect(position[5]).eq(toUsd(49.99875)) // pnl
+    expect(position[6]).eq(true) // hasRealisedProfit
 
     expect(await vault.feeReserves(dai.address)).eq("440000000000000000") // 0.44
     expect(await vault.reservedAmounts(dai.address)).eq(expandDecimals(40, 18))

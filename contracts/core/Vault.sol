@@ -2,8 +2,6 @@
 
 pragma solidity 0.6.12;
 
-import "hardhat/console.sol";
-
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
@@ -24,6 +22,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 averagePrice;
         uint256 entryFundingRate;
         uint256 reserveAmount;
+        int256 pnl;
     }
 
     uint256 constant BASIS_POINTS_DIVISOR = 10000;
@@ -541,10 +540,10 @@ contract Vault is ReentrancyGuard, IVault {
         return _usdAmount.mul(10 ** decimals).div(_price);
     }
 
-    function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256, uint256, uint256, uint256, uint256) {
+    function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool) {
         bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
         Position memory position = positions[key];
-        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
+        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, uint256(position.pnl), position.pnl >= 0);
     }
 
     function getPositionKey(address _account, address _collateralToken, address _indexToken, bool _isLong) public pure returns (bytes32) {
@@ -634,13 +633,14 @@ contract Vault is ReentrancyGuard, IVault {
 
         uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
         (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
-        // get the proportional change in PnL
+        // get the proportional change in pnl
         uint256 adjustedDelta = _sizeDelta.mul(delta).div(position.size);
 
         uint256 usdOut;
         // transfer profits out
         if (hasProfit && adjustedDelta > 0) {
             usdOut = adjustedDelta;
+            position.pnl = position.pnl + int256(adjustedDelta);
         }
 
         if (!hasProfit && adjustedDelta > 0) {
@@ -653,6 +653,8 @@ contract Vault is ReentrancyGuard, IVault {
                 uint256 tokenAmount = usdToTokenMin(_collateralToken, adjustedDelta);
                 _increasePoolAmount(_collateralToken, tokenAmount);
             }
+
+            position.pnl = position.pnl - int256(adjustedDelta);
         }
 
         // reduce the position's collateral by _collateralDelta
