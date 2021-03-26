@@ -39,6 +39,7 @@ contract Vault is ReentrancyGuard, IVault {
     address public gov;
     uint256 public govUnlockTime;
 
+    uint256 public maxUsdg;
     uint256 public liquidationFeeUsd;
     uint256 public maxLeverage = 50 * 10000; // 50x
     uint256 public priceSampleSpace = 3;
@@ -57,8 +58,9 @@ contract Vault is ReentrancyGuard, IVault {
     mapping (address => bool) public whitelistedTokens;
     mapping (address => address) public priceFeeds;
     mapping (address => uint256) public priceDecimals;
-    mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public tokenDecimals;
+    mapping (address => uint256) public redemptionBasisPoints;
+    mapping (address => uint256) public minProfitBasisPoints;
     mapping (address => bool) public stableTokens;
 
     // tokenBalances is used only to determine _transferIn values
@@ -101,11 +103,12 @@ contract Vault is ReentrancyGuard, IVault {
         gov = msg.sender;
     }
 
-    function initialize(address _usdg, uint256 _liquidationFeeUsd) external onlyGov {
+    function initialize(address _usdg, uint256 _maxUsdg, uint256 _liquidationFeeUsd) external onlyGov {
         require(!isInitialized, "Vault: already initialized");
         isInitialized = true;
 
         usdg = _usdg;
+        maxUsdg = _maxUsdg;
         liquidationFeeUsd = _liquidationFeeUsd;
     }
 
@@ -122,8 +125,9 @@ contract Vault is ReentrancyGuard, IVault {
         address _token,
         address _priceFeed,
         uint256 _priceDecimals,
-        uint256 _redemptionBps,
         uint256 _tokenDecimals,
+        uint256 _redemptionBps,
+        uint256 _minProfitBps,
         bool _isStable
     ) external nonReentrant onlyGov afterGovUnlockTime {
         require(!whitelistedTokens[_token], "Vault: token already whitelisted");
@@ -131,8 +135,9 @@ contract Vault is ReentrancyGuard, IVault {
         whitelistedTokens[_token] = true;
         priceFeeds[_token] = _priceFeed;
         priceDecimals[_token] = _priceDecimals;
-        redemptionBasisPoints[_token] = _redemptionBps;
         tokenDecimals[_token] = _tokenDecimals;
+        redemptionBasisPoints[_token] = _redemptionBps;
+        minProfitBasisPoints[_token] = _minProfitBps;
         stableTokens[_token] = _isStable;
 
         // validate price feed
@@ -163,6 +168,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 mintAmount = amountAfterFees.mul(price).div(PRICE_PRECISION);
         mintAmount = adjustForDecimals(mintAmount, _token, usdg);
         require(mintAmount > 0, "Vault: invalid mintAmount");
+        require(IERC20(usdg).totalSupply().add(mintAmount) <= maxUsdg, "Vault: maxUsdg exceeded");
 
         IUSDG(usdg).mint(_receiver, mintAmount);
 
@@ -600,15 +606,24 @@ contract Vault is ReentrancyGuard, IVault {
         require(_averagePrice > 0, "Vault: invalid _averagePrice");
         uint256 price = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
         uint256 priceDelta = _averagePrice > price ? _averagePrice.sub(price) : price.sub(_averagePrice);
-        uint256 sizeDelta = _size.mul(priceDelta).div(_averagePrice);
+        uint256 delta = _size.mul(priceDelta).div(_averagePrice);
+
+        bool hasProfit;
 
         if (_isLong) {
-            bool hasProfit = price > _averagePrice;
-            return (hasProfit, sizeDelta);
+            hasProfit = price > _averagePrice;
+        } else {
+            hasProfit = _averagePrice > price;
         }
 
-        bool hasProfit = _averagePrice > price;
-        return (hasProfit, sizeDelta);
+        // the profit is zero-ed out if the minimum % of profit is not reached
+        // this helps to prevent front-running issues
+        uint256 minBps = minProfitBasisPoints[_indexToken];
+        if (hasProfit && delta.mul(BASIS_POINTS_DIVISOR) <= _size.mul(minBps)) {
+            delta = 0;
+        }
+
+        return (hasProfit, delta);
     }
 
     function getFundingFee(address _token, uint256 _size, uint256 _entryFundingRate) public view returns (uint256) {

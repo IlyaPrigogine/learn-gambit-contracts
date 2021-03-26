@@ -22,7 +22,7 @@ describe("Vault", function () {
   beforeEach(async () => {
     vault = await deployContract("Vault", [])
     usdg = await deployContract("USDG", [vault.address])
-    await vault.initialize(usdg.address, toUsd(5))
+    await vault.initialize(usdg.address, expandDecimals(200 * 1000, 18), toUsd(5))
 
     bnb = await deployContract("Token", [])
     bnbPriceFeed = await deployContract("PriceFeed", [])
@@ -77,8 +77,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     ]
 
@@ -124,8 +125,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     ]
 
@@ -181,8 +183,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -217,8 +220,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -246,8 +250,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -272,8 +277,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -304,8 +310,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -314,8 +321,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -360,8 +368,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -409,8 +418,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -422,8 +432,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -496,8 +507,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
     await expect(vault.connect(user1).increasePosition(user0.address, btc.address, btc.address, 0, true))
@@ -514,8 +526,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -568,8 +581,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -652,8 +666,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
     await expect(vault.connect(user1).decreasePosition(user0.address, btc.address, btc.address, 0, 0, true, user2.address))
@@ -670,8 +685,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -760,8 +776,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
     await expect(vault.connect(user0).liquidatePosition(user0.address, btc.address, bnb.address, true, user2.address))
@@ -776,8 +793,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -863,8 +881,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
     await expect(vault.connect(user1).increasePosition(user0.address, dai.address, btc.address, 0, false))
@@ -878,8 +897,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
     await expect(vault.connect(user0).increasePosition(user0.address, dai.address, dai.address, toUsd(1000), false))
@@ -893,8 +913,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -946,8 +967,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
@@ -955,8 +977,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
 
@@ -1025,8 +1048,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
     await expect(vault.connect(user1).decreasePosition(user0.address, btc.address, btc.address, 0, 0, false, user2.address))
@@ -1040,8 +1064,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
     await expect(vault.connect(user0).decreasePosition(user0.address, dai.address, dai.address, 0, toUsd(1000), false, user2.address))
@@ -1052,8 +1077,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
@@ -1142,8 +1168,9 @@ describe("Vault", function () {
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
     await expect(vault.connect(user0).liquidatePosition(user0.address, dai.address, bnb.address, false, user2.address))
@@ -1156,8 +1183,9 @@ describe("Vault", function () {
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       true // _isStable
     )
     await expect(vault.connect(user0).liquidatePosition(user0.address, dai.address, dai.address, false, user2.address))
@@ -1168,8 +1196,9 @@ describe("Vault", function () {
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
-      9000, // _redemptionBps
       8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
       false // _isStable
     )
 
