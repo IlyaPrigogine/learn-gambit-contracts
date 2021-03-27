@@ -18,6 +18,8 @@ describe("Vault", function () {
   let btcPriceFeed
   let dai
   let daiPriceFeed
+  let distributor0
+  let yieldTracker0
 
   beforeEach(async () => {
     vault = await deployContract("Vault", [])
@@ -32,6 +34,15 @@ describe("Vault", function () {
 
     dai = await deployContract("Token", [])
     daiPriceFeed = await deployContract("PriceFeed", [])
+
+    distributor0 = await deployContract("TimeDistributor", [])
+    yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
+
+    await yieldTracker0.setDistributor(distributor0.address)
+    await distributor0.setDistribution([yieldTracker0.address], [1000], [bnb.address])
+
+    await bnb.mint(distributor0.address, 5000)
+    await usdg.updateYieldTrackers([yieldTracker0.address])
   })
 
   it("inits", async () => {
@@ -315,7 +326,8 @@ describe("Vault", function () {
     await expect(vault.connect(user0).sellUSDG(btc.address, user1.address))
       .to.be.revertedWith("Vault: empty collateral")
 
-    await vault.connect(user0).sellUSDG(bnb.address, user1.address)
+    const tx = await vault.connect(user0).sellUSDG(bnb.address, user1.address)
+    await reportGasUsed(provider, tx, "sellUSDG gas used")
     expect(await usdg.balanceOf(user0.address)).eq(29700 - 15000)
     expect(await usdg.balanceOf(user1.address)).eq(0)
     expect(await vault.feeReserves(bnb.address)).eq(2)

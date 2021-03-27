@@ -9,7 +9,7 @@ import "../libraries/utils/ReentrancyGuard.sol";
 
 import "../oracle/interfaces/IPriceFeed.sol";
 
-import "./interfaces/IUSDG.sol";
+import "../tokens/interfaces/IUSDG.sol";
 import "./interfaces/IVault.sol";
 
 contract Vault is ReentrancyGuard, IVault {
