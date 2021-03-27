@@ -16,7 +16,7 @@ async function main() {
   const amounts = []
 
   for (let i = 0; i < accounts.length; i++) {
-    console.log("accounts[i]", i, accounts[i])
+    console.info("accounts[i]", i, accounts[i])
     addresses.push(accounts[i][0])
     amounts.push(ethers.utils.parseEther(accounts[i][1]))
   }
