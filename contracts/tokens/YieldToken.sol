@@ -61,7 +61,7 @@ contract YieldToken is IERC20, IYieldToken {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
-    function updateYieldTrackers(address[] memory _yieldTrackers) external onlyGov {
+    function setYieldTrackers(address[] memory _yieldTrackers) external onlyGov {
         yieldTrackers = _yieldTrackers;
     }
 

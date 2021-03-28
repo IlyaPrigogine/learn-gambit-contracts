@@ -28,7 +28,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 constant BASIS_POINTS_DIVISOR = 10000;
     uint256 constant FUNDING_RATE_PRECISION = 1000000;
     uint256 constant PRICE_PRECISION = 10 ** 30;
-    uint256 constant MIN_LEVERAGE = 10000;
+    uint256 constant MIN_LEVERAGE = 10000; // 1x
     uint256 constant USDG_DECIMALS = 18;
     uint256 constant MAX_FEE_BASIS_POINTS = 500; // 5%
     uint256 constant MAX_LIQUIDATION_FEE_USD = 100 * PRICE_PRECISION; // 100 USD
@@ -43,15 +43,15 @@ contract Vault is ReentrancyGuard, IVault {
     address public gov;
 
     uint256 public maxUsdg;
-    uint256 public liquidationFeeUsd;
     uint256 public maxLeverage = 50 * 10000; // 50x
     uint256 public priceSampleSpace = 3;
 
-    uint256 public fundingInterval = 8 hours;
-    uint256 public fundingRateFactor;
-
+    uint256 public liquidationFeeUsd;
     uint256 public swapFeeBasisPoints = 30; // 0.3%
     uint256 public marginFeeBasisPoints = 10; // 0.1%
+
+    uint256 public fundingInterval = 8 hours;
+    uint256 public fundingRateFactor;
 
     mapping (address => mapping (address => bool)) public approvedRouters;
 
@@ -93,6 +93,7 @@ contract Vault is ReentrancyGuard, IVault {
     event BuyUSDG(address token, uint256 tokenAmount, uint256 usdgAmount);
     event SellUSDG(address token, uint256 usdgAmount, uint256 tokenAmount);
     event Swap(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+
     event IncreasePosition(
         bytes32 key,
         address account,
@@ -128,10 +129,21 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 entryFundingRate,
         uint256 reserveAmount
     );
+
     event UpdateFundingRate(address token, uint256 fundingRate);
     event UpdatePnl(bytes32 key, bool hasProfit, uint256 delta);
+
     event CollectSwapFees(address token, uint256 feeAmount);
     event CollectMarginFees(address token, uint256 feeUsd, uint256 feeTokens);
+
+    event IncreasePoolAmount(address token, uint256 amount);
+    event DecreasePoolAmount(address token, uint256 amount);
+    event IncreaseUsdgAmount(address token, uint256 amount);
+    event DecreaseUsdgAmount(address token, uint256 amount);
+    event IncreaseReservedAmount(address token, uint256 amount);
+    event DecreaseReservedAmount(address token, uint256 amount);
+    event IncreaseGuaranteedUsd(address token, uint256 amount);
+    event DecreaseGuaranteedUsd(address token, uint256 amount);
 
     modifier onlyGov() {
         require(msg.sender == gov, "Vault: forbidden");
@@ -157,42 +169,43 @@ contract Vault is ReentrancyGuard, IVault {
         maxUsdg = _maxUsdg;
         liquidationFeeUsd = _liquidationFeeUsd;
         fundingRateFactor = _fundingRateFactor;
-
     }
 
     function setGov(address _gov) external onlyGov {
         gov = _gov;
     }
 
-    function updateSettings(
-        uint256 _maxUsdg,
-        uint256 _liquidationFeeUsd,
-        uint256 _maxLeverage,
-        uint256 _priceSampleSpace,
-        uint256 _fundingInterval,
-        uint256 _fundingRateFactor,
-        uint256 _swapFeeBasisPoints,
-        uint256 _marginFeeBasisPoints
-    ) external nonReentrant onlyGov {
-        require(_liquidationFeeUsd <= MAX_LIQUIDATION_FEE_USD, "Vault: invalid _liquidationFeeUsd");
+    function setMaxUsdg(uint256 _maxUsdg) external nonReentrant onlyGov {
+        maxUsdg = _maxUsdg;
+    }
+
+    function setMaxLeverage(uint256 _maxLeverage) external nonReentrant onlyGov {
         require(_maxLeverage > MIN_LEVERAGE, "Vault: invalid _maxLeverage");
+        maxLeverage = _maxLeverage;
+    }
+
+    function setPriceSampleSpace(uint256 _priceSampleSpace) external nonReentrant onlyGov {
         require(_priceSampleSpace > 0, "Vault: invalid _priceSampleSpace");
-        require(_fundingInterval > MIN_FUNDING_RATE_INTERVAL, "Vault: invalid _fundingInterval");
-        require(_fundingRateFactor <= MAX_FUNDING_RATE_FACTOR, "Vault: invalid _fundingRateFactor");
+        priceSampleSpace = _priceSampleSpace;
+    }
+
+    function setFees(uint256 _liquidationFeeUsd, uint256 _swapFeeBasisPoints, uint256 _marginFeeBasisPoints) external nonReentrant onlyGov {
+        require(_liquidationFeeUsd <= MAX_LIQUIDATION_FEE_USD, "Vault: invalid _liquidationFeeUsd");
         require(_swapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _swapFeeBasisPoints");
         require(_marginFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _marginFeeBasisPoints");
-
-        maxUsdg = _maxUsdg;
         liquidationFeeUsd = _liquidationFeeUsd;
-        maxLeverage = _maxLeverage;
-        priceSampleSpace = _priceSampleSpace;
-        fundingInterval = _fundingInterval;
-        fundingRateFactor = _fundingRateFactor;
         swapFeeBasisPoints = _swapFeeBasisPoints;
         marginFeeBasisPoints = _marginFeeBasisPoints;
     }
 
-    function updateTokenConfig(
+    function setFundingRate(uint256 _fundingInterval, uint256 _fundingRateFactor) external nonReentrant onlyGov {
+        require(_fundingInterval > MIN_FUNDING_RATE_INTERVAL, "Vault: invalid _fundingInterval");
+        require(_fundingRateFactor <= MAX_FUNDING_RATE_FACTOR, "Vault: invalid _fundingRateFactor");
+        fundingInterval = _fundingInterval;
+        fundingRateFactor = _fundingRateFactor;
+    }
+
+    function setTokenConfig(
         address _token,
         address _priceFeed,
         uint256 _priceDecimals,
@@ -218,8 +231,9 @@ contract Vault is ReentrancyGuard, IVault {
         delete whitelistedTokens[_token];
         delete priceFeeds[_token];
         delete priceDecimals[_token];
-        delete redemptionBasisPoints[_token];
         delete tokenDecimals[_token];
+        delete redemptionBasisPoints[_token];
+        delete minProfitBasisPoints[_token];
         delete stableTokens[_token];
     }
 
@@ -864,15 +878,18 @@ contract Vault is ReentrancyGuard, IVault {
         poolAmounts[_token] = poolAmounts[_token].add(_amount);
         uint256 balance = IERC20(_token).balanceOf(address(this));
         require(poolAmounts[_token] <= balance, "Vault: invalid increase");
+        emit IncreasePoolAmount(_token, _amount);
     }
 
     function _decreasePoolAmount(address _token, uint256 _amount) private {
         poolAmounts[_token] = poolAmounts[_token].sub(_amount, "Vault: poolAmount exceeded");
         require(reservedAmounts[_token] <= poolAmounts[_token], "Vault: reserve exceeds pool");
+        emit DecreasePoolAmount(_token, _amount);
     }
 
     function _increaseUsdgAmount(address _token, uint256 _amount) private {
         usdgAmounts[_token] = usdgAmounts[_token].add(_amount);
+        emit IncreaseUsdgAmount(_token, _amount);
     }
 
     function _decreaseUsdgAmount(address _token, uint256 _amount) private {
@@ -882,25 +899,31 @@ contract Vault is ReentrancyGuard, IVault {
         // the USDG debt is capped to zero for this case
         if (value <= _amount) {
             usdgAmounts[_token] = 0;
+            emit DecreaseUsdgAmount(_token, value);
             return;
         }
         usdgAmounts[_token] = value.sub(_amount);
+        emit DecreaseUsdgAmount(_token, _amount);
     }
 
     function _increaseReservedAmount(address _token, uint256 _amount) private {
         reservedAmounts[_token] = reservedAmounts[_token].add(_amount);
         require(reservedAmounts[_token] <= poolAmounts[_token], "Vault: reserve exceeds pool");
+        emit IncreaseReservedAmount(_token, _amount);
     }
 
     function _decreaseReservedAmount(address _token, uint256 _amount) private {
         reservedAmounts[_token] = reservedAmounts[_token].sub(_amount, "Vault: insufficient reserve");
+        emit DecreaseReservedAmount(_token, _amount);
     }
 
     function _increaseGuaranteedUsd(address _token, uint256 _usdAmount) private {
         guaranteedUsd[_token] = guaranteedUsd[_token].add(_usdAmount);
+        emit IncreaseGuaranteedUsd(_token, _usdAmount);
     }
 
     function _decreaseGuaranteedUsd(address _token, uint256 _usdAmount) private {
         guaranteedUsd[_token] = guaranteedUsd[_token].sub(_usdAmount);
+        emit DecreaseGuaranteedUsd(_token, _usdAmount);
     }
 }

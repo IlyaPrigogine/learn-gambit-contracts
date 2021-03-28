@@ -43,7 +43,7 @@ describe("YieldToken", function () {
     await increaseTime(provider, 60 * 60 + 10)
     await mineBlock(provider)
 
-    await yieldToken.updateYieldTrackers([yieldTracker0.address])
+    await yieldToken.setYieldTrackers([yieldTracker0.address])
     await yieldToken.claim(user1.address)
     expect(await bnb.balanceOf(user1.address)).eq(800)
     expect(await bnb.balanceOf(yieldTracker0.address)).eq(200)
@@ -53,7 +53,7 @@ describe("YieldToken", function () {
     const tx1 = await yieldToken.transfer(user0.address, 200)
     await reportGasUsed(provider, tx1, "tranfer1 gas used")
 
-    await yieldToken.updateYieldTrackers([yieldTracker0.address, yieldTracker1.address])
+    await yieldToken.setYieldTrackers([yieldTracker0.address, yieldTracker1.address])
 
     const tx2 = await yieldToken.transfer(user0.address, 200)
     await reportGasUsed(provider, tx2, "tranfer2 gas used")

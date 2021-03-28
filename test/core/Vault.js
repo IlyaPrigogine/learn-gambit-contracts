@@ -42,7 +42,7 @@ describe("Vault", function () {
     await distributor0.setDistribution([yieldTracker0.address], [1000], [bnb.address])
 
     await bnb.mint(distributor0.address, 5000)
-    await usdg.updateYieldTrackers([yieldTracker0.address])
+    await usdg.setYieldTrackers([yieldTracker0.address])
   })
 
   it("inits", async () => {
@@ -67,7 +67,7 @@ describe("Vault", function () {
     expect(await vault.gov()).eq(user1.address)
   })
 
-  it("updateTokenConfig", async () => {
+  it("setTokenConfig", async () => {
     const params = [
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
@@ -78,10 +78,10 @@ describe("Vault", function () {
       false // _isStable
     ]
 
-    await expect(vault.connect(user0).updateTokenConfig(...params))
+    await expect(vault.connect(user0).setTokenConfig(...params))
       .to.be.revertedWith("Vault: forbidden")
 
-    await expect(vault.updateTokenConfig(...params))
+    await expect(vault.setTokenConfig(...params))
       .to.be.revertedWith("Vault: could not fetch price")
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
@@ -93,7 +93,7 @@ describe("Vault", function () {
     expect(await vault.tokenDecimals(bnb.address)).eq(0)
     expect(await vault.stableTokens(bnb.address)).eq(false)
 
-    await vault.updateTokenConfig(...params)
+    await vault.setTokenConfig(...params)
 
     expect(await vault.whitelistedTokens(bnb.address)).eq(true)
     expect(await vault.priceFeeds(bnb.address)).eq(bnbPriceFeed.address)
@@ -123,7 +123,7 @@ describe("Vault", function () {
     expect(await vault.tokenDecimals(bnb.address)).eq(0)
     expect(await vault.stableTokens(bnb.address)).eq(false)
 
-    await vault.updateTokenConfig(...params)
+    await vault.setTokenConfig(...params)
 
     expect(await vault.whitelistedTokens(bnb.address)).eq(true)
     expect(await vault.priceFeeds(bnb.address)).eq(bnbPriceFeed.address)
@@ -153,7 +153,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _token not whitelisted")
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -190,7 +190,7 @@ describe("Vault", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(200))
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(250))
 
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -220,7 +220,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _token not whitelisted")
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -247,7 +247,7 @@ describe("Vault", function () {
 
   it("buyUSDG adjusts for decimals", async () => {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -280,7 +280,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _token not whitelisted")
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -291,7 +291,7 @@ describe("Vault", function () {
     )
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -339,7 +339,7 @@ describe("Vault", function () {
 
   it("sellUSDG after a price increase", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -389,7 +389,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _tokenIn not whitelisted")
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -403,7 +403,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _tokenOut not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -478,7 +478,7 @@ describe("Vault", function () {
 
   it("increasePosition long validations", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -497,7 +497,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -552,7 +552,7 @@ describe("Vault", function () {
 
   it("increasePosition long", async () => {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -637,7 +637,7 @@ describe("Vault", function () {
 
   it("decreasePosition long", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -656,7 +656,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -747,7 +747,7 @@ describe("Vault", function () {
 
   it("liquidate long", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -764,7 +764,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -853,7 +853,7 @@ describe("Vault", function () {
 
   it("increasePosition short validations", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -869,7 +869,7 @@ describe("Vault", function () {
     await expect(vault.connect(user0).increasePosition(user0.address, bnb.address, bnb.address, toUsd(1000), false))
       .to.be.revertedWith("Vault: _collateralToken must be a stableToken")
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -885,7 +885,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: invalid price feed")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -939,7 +939,7 @@ describe("Vault", function () {
 
   it("increasePosition short", async () => {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -949,7 +949,7 @@ describe("Vault", function () {
       false // _isStable
     )
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -1020,7 +1020,7 @@ describe("Vault", function () {
 
   it("decreasePosition short", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -1036,7 +1036,7 @@ describe("Vault", function () {
     await expect(vault.connect(user0).decreasePosition(user0.address, bnb.address, btc.address, 0, toUsd(1000), false, user2.address))
       .to.be.revertedWith("Vault: _collateralToken must be a stableToken")
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -1049,7 +1049,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _indexToken must not be a stableToken")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -1140,7 +1140,7 @@ describe("Vault", function () {
 
   it("liquidate short", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       bnb.address, // _token
       bnbPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -1155,7 +1155,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _collateralToken must be a stableToken")
 
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       dai.address, // _token
       daiPriceFeed.address, // _priceFeed
       8, // _priceDecimals
@@ -1168,7 +1168,7 @@ describe("Vault", function () {
       .to.be.revertedWith("Vault: _indexToken must not be a stableToken")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await vault.updateTokenConfig(
+    await vault.setTokenConfig(
       btc.address, // _token
       btcPriceFeed.address, // _priceFeed
       8, // _priceDecimals
