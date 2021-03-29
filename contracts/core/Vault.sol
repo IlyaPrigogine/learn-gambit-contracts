@@ -244,6 +244,14 @@ contract Vault is ReentrancyGuard, IVault {
         _transferOut(_token, amount, _receiver);
     }
 
+    function addRouter(address _router) external {
+        approvedRouters[msg.sender][_router] = true;
+    }
+
+    function removeRouter(address _router) external {
+        approvedRouters[msg.sender][_router] = false;
+    }
+
     function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
 
@@ -354,8 +362,9 @@ contract Vault is ReentrancyGuard, IVault {
 
         uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
         uint256 collateralDelta = _transferIn(_collateralToken);
+        uint256 collateralDeltaUsd = tokenToUsdMin(_collateralToken, collateralDelta);
 
-        position.collateral = position.collateral.add(tokenToUsdMin(_collateralToken, collateralDelta));
+        position.collateral = position.collateral.add(collateralDeltaUsd);
         require(position.collateral >= fee, "Vault: insufficient collateral for fees");
 
         position.collateral = position.collateral.sub(fee);
@@ -372,7 +381,11 @@ contract Vault is ReentrancyGuard, IVault {
         _increaseReservedAmount(_collateralToken, reserveDelta);
 
         if (_isLong) {
-            _increaseGuaranteedUsd(_collateralToken, _sizeDelta);
+            if (_sizeDelta > collateralDeltaUsd) {
+                _increaseGuaranteedUsd(_collateralToken, _sizeDelta.sub(collateralDeltaUsd));
+            } else {
+                _decreaseGuaranteedUsd(_collateralToken, collateralDeltaUsd);
+            }
             // treat the deposited collateral as part of the pool
             _increasePoolAmount(_collateralToken, collateralDelta);
             // fees need to be deducted from the pool since collateral is treated as part of the pool
