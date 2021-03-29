@@ -7,15 +7,23 @@ import "./YieldToken.sol";
 
 contract USDG is YieldToken, IUSDG {
 
-    address public vault;
+    mapping (address => bool) public vaults;
 
     modifier onlyVault() {
-        require(msg.sender == vault, "USDG: forbidden");
+        require(vaults[msg.sender], "USDG: forbidden");
         _;
     }
 
     constructor(address _vault) public YieldToken("USD Gambit", "USDG", 0) {
-        vault = _vault;
+        vaults[_vault] = true;
+    }
+
+    function addVault(address _vault) external onlyGov {
+        vaults[_vault] = true;
+    }
+
+    function removeVault(address _vault) external onlyGov {
+        vaults[_vault] = false;
     }
 
     function mint(address _account, uint256 _amount) external override onlyVault {

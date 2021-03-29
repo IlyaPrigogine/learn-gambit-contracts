@@ -44,6 +44,11 @@ contract YieldToken is IERC20, IYieldToken {
         gov = _gov;
     }
 
+    function setInfo(string memory _name, string memory _symbol) external onlyGov {
+        name = _name;
+        symbol = _symbol;
+    }
+
     function addNonStakingAccount(address _account) external onlyGov {
         require(!nonStakingAccounts[_account], "YieldToken: _account already marked");
         nonStakingAccounts[_account] = true;

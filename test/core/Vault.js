@@ -47,7 +47,8 @@ describe("Vault", function () {
 
   it("inits", async () => {
     expect(await usdg.gov()).eq(wallet.address)
-    expect(await usdg.vault()).eq(vault.address)
+    expect(await usdg.vaults(vault.address)).eq(true)
+    expect(await usdg.vaults(user0.address)).eq(false)
 
     expect(await vault.gov()).eq(wallet.address)
     expect(await vault.usdg()).eq(usdg.address)
