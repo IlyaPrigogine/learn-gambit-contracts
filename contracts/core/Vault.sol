@@ -393,11 +393,11 @@ contract Vault is ReentrancyGuard, IVault {
         require(position.size > 0, "Vault: empty position");
         require(position.size >= _sizeDelta, "Vault: position size exceeded");
 
-        (uint256 usdOut, uint256 usdOutAfterFee) = _reduceCollateral(_account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
-
         uint256 reserveDelta = position.reserveAmount.mul(_sizeDelta).div(position.size);
         position.reserveAmount = position.reserveAmount.sub(reserveDelta);
         _decreaseReservedAmount(_collateralToken, reserveDelta);
+
+        (uint256 usdOut, uint256 usdOutAfterFee) = _reduceCollateral(_account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
 
         if (position.size != _sizeDelta) {
             position.entryFundingRate = cumulativeFundingRates[_collateralToken];
@@ -417,10 +417,12 @@ contract Vault is ReentrancyGuard, IVault {
         emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
 
         if (usdOut > 0) {
-            uint256 amountOut = usdToTokenMin(_collateralToken, usdOut);
-            _decreasePoolAmount(_collateralToken, amountOut);
+            if (_isLong) {
+                _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, usdOut));
+            }
+            uint256 amountOutAfterFees = usdToTokenMin(_collateralToken, usdOutAfterFee);
             _transferOut(_collateralToken, usdToTokenMin(_collateralToken, usdOutAfterFee), _receiver);
-            return amountOut;
+            return amountOutAfterFees;
         }
 
         return 0;
@@ -653,7 +655,8 @@ contract Vault is ReentrancyGuard, IVault {
     function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool) {
         bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
         Position memory position = positions[key];
-        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, uint256(position.pnl), position.pnl >= 0);
+        uint256 pnl = position.pnl > 0 ? uint256(position.pnl) : uint256(-position.pnl);
+        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, pnl, position.pnl >= 0);
     }
 
     function getPositionKey(address _account, address _collateralToken, address _indexToken, bool _isLong) public pure returns (bytes32) {
@@ -764,15 +767,28 @@ contract Vault is ReentrancyGuard, IVault {
         Position storage position = positions[key];
 
         uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
-        (bool hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
+        bool hasProfit;
+        uint256 adjustedDelta;
+
+        // scope variables to avoid stack too deep errors
+        {
+        (bool _hasProfit, uint256 delta) = getDelta(_indexToken, position.size, position.averagePrice, _isLong);
+        hasProfit = _hasProfit;
         // get the proportional change in pnl
-        uint256 adjustedDelta = _sizeDelta.mul(delta).div(position.size);
+        adjustedDelta = _sizeDelta.mul(delta).div(position.size);
+        }
 
         uint256 usdOut;
         // transfer profits out
         if (hasProfit && adjustedDelta > 0) {
             usdOut = adjustedDelta;
             position.pnl = position.pnl + int256(adjustedDelta);
+
+            // pay out realised profits from the pool amount for short positions
+            if (!_isLong) {
+                uint256 tokenAmount = usdToTokenMin(_collateralToken, adjustedDelta);
+                _decreasePoolAmount(_collateralToken, tokenAmount);
+            }
         }
 
         if (!hasProfit && adjustedDelta > 0) {
@@ -809,6 +825,10 @@ contract Vault is ReentrancyGuard, IVault {
             usdOutAfterFee = usdOut.sub(fee);
         } else {
             position.collateral = position.collateral.sub(fee);
+            if (_isLong) {
+                uint256 feeTokens = usdToTokenMin(_collateralToken, fee);
+                _decreasePoolAmount(_collateralToken, feeTokens);
+            }
         }
 
         emit UpdatePnl(key, hasProfit, adjustedDelta);
