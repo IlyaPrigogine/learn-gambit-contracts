@@ -130,7 +130,7 @@ describe("Vault.liquidateLongPosition", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969)
     expect(await vault.reservedAmounts(btc.address)).eq(225000)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219)
     expect(await btc.balanceOf(user2.address)).eq(0)
 

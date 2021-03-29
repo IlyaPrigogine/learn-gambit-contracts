@@ -115,8 +115,8 @@ describe("Vault.depositCollateral", function () {
 
     expect(await vault.poolAmounts(btc.address)).eq(256792 - 114)
     expect(await vault.reservedAmounts(btc.address)).eq(117500)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(38))
-    expect(await vault.getRedemptionCollateralUsd(btc.address)).eq(toUsd(92.744)) // (256792 - 117500) sats * 40000 => 51.7968, 47 / 40000 * 41000 => ~45.8536
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(38.047))
+    expect(await vault.getRedemptionCollateralUsd(btc.address)).eq(toUsd(92.79)) // (256792 - 117500) sats * 40000 => 51.7968, 47 / 40000 * 41000 => ~45.8536
 
     position = await vault.getPosition(user0.address, btc.address, btc.address, true)
     expect(position[0]).eq(toUsd(47)) // size

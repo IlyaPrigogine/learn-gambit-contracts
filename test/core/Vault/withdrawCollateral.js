@@ -98,7 +98,7 @@ describe("Vault.withdrawCollateral", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969)
     expect(await vault.reservedAmounts(btc.address)).eq(225000)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -119,7 +119,7 @@ describe("Vault.withdrawCollateral", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969 + 106) // 0.00000106 * 45100 => ~0.05 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 / 90 * 40)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(33))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(33.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 16878 - 106 - 1 - 219)
     expect(await btc.balanceOf(user2.address)).eq(16878) // 0.00016878 * 47100 => 7.949538 USD
 
@@ -140,7 +140,7 @@ describe("Vault.withdrawCollateral", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969 + 106) // 0.00000106 * 45100 => ~0.05 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 / 90 * 40)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(34))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(34.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 16878 - 106 - 1 - 2123 - 219) // 0.00002123* 47100 => 1 USD
     expect(await btc.balanceOf(user2.address)).eq(16878 + 2123)
   })

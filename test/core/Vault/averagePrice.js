@@ -98,7 +98,7 @@ describe("Vault.averagePrice", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969)
     expect(await vault.reservedAmounts(btc.address)).eq(225000)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -123,7 +123,7 @@ describe("Vault.averagePrice", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969 + 21) // 0.00000021 * 45100 => 0.01 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 + 22172)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(90))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(90.1))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219 - 21)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -194,7 +194,7 @@ describe("Vault.averagePrice", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969)
     expect(await vault.reservedAmounts(btc.address)).eq(225000)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -219,7 +219,7 @@ describe("Vault.averagePrice", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969 + 22) // 0.00000021 * 45100 => 0.01 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 + 22172)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(90))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(90.1))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219 - 22)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -295,7 +295,7 @@ describe("Vault.averagePrice", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969)
     expect(await vault.reservedAmounts(btc.address)).eq(225000)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -321,7 +321,7 @@ describe("Vault.averagePrice", function () {
 
     expect(await vault.feeReserves(btc.address)).eq(969 + 27) // 0.00000027 * 36900 => 0.01 USD
     expect(await vault.reservedAmounts(btc.address)).eq(225000 + 27100)
-    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.775))
+    expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(80.875))
     expect(await vault.poolAmounts(btc.address)).eq(274250 + 25000 - 219 - 27)
     expect(await btc.balanceOf(user2.address)).eq(0)
 
@@ -337,5 +337,4 @@ describe("Vault.averagePrice", function () {
     expect(delta[0]).eq(true)
     expect(delta[1]).eq("1111111111111111111111111111111") // ~1.111
   })
-
 })

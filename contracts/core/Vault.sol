@@ -381,11 +381,9 @@ contract Vault is ReentrancyGuard, IVault {
         _increaseReservedAmount(_collateralToken, reserveDelta);
 
         if (_isLong) {
-            if (_sizeDelta > collateralDeltaUsd) {
-                _increaseGuaranteedUsd(_collateralToken, _sizeDelta.sub(collateralDeltaUsd));
-            } else {
-                _decreaseGuaranteedUsd(_collateralToken, collateralDeltaUsd);
-            }
+            // add the fee as it has been subtracted from the collateral
+            _increaseGuaranteedUsd(_collateralToken, _sizeDelta.add(fee));
+            _decreaseGuaranteedUsd(_collateralToken, collateralDeltaUsd);
             // treat the deposited collateral as part of the pool
             _increasePoolAmount(_collateralToken, collateralDelta);
             // fees need to be deducted from the pool since collateral is treated as part of the pool
@@ -428,8 +426,10 @@ contract Vault is ReentrancyGuard, IVault {
                 _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
             }
         } else {
-            _increaseGuaranteedUsd(_collateralToken, collateral);
-            _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
+            if (_isLong) {
+                _increaseGuaranteedUsd(_collateralToken, collateral);
+                _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
+            }
             delete positions[key];
         }
 
@@ -974,11 +974,6 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function _decreaseGuaranteedUsd(address _token, uint256 _usdAmount) private {
-        if (_usdAmount >= guaranteedUsd[_token]) {
-            emit DecreaseGuaranteedUsd(_token, guaranteedUsd[_token]);
-            guaranteedUsd[_token] = 0;
-            return;
-        }
         guaranteedUsd[_token] = guaranteedUsd[_token].sub(_usdAmount);
         emit DecreaseGuaranteedUsd(_token, _usdAmount);
     }
