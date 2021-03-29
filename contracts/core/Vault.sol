@@ -349,9 +349,7 @@ contract Vault is ReentrancyGuard, IVault {
         }
 
         if (position.size > 0 && _sizeDelta > 0) {
-            uint256 qtyDelta = _sizeDelta.div(price);
-            uint256 qty = position.size.div(position.averagePrice).add(qtyDelta);
-            position.averagePrice = position.size.add(_sizeDelta).div(qty);
+            position.averagePrice = getNextAveragePrice(_indexToken, position.size, position.averagePrice, _isLong, price, _sizeDelta);
         }
 
         uint256 fee = _collectMarginFees(_collateralToken, _sizeDelta, position.size, position.entryFundingRate);
@@ -377,6 +375,8 @@ contract Vault is ReentrancyGuard, IVault {
             _increaseGuaranteedUsd(_collateralToken, _sizeDelta);
             // treat the deposited collateral as part of the pool
             _increasePoolAmount(_collateralToken, collateralDelta);
+            // fees need to be deducted from the pool since collateral is treated as part of the pool
+            _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, fee));
         }
 
         emit IncreasePosition(key, _account, _collateralToken, _indexToken, _sizeDelta, _isLong);
@@ -683,16 +683,20 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function getNextFundingRate(address _token) public view returns (uint256) {
-        if (lastFundingTimes[_token].add(fundingInterval) > block.timestamp) {
-            return 0;
-        }
+        if (lastFundingTimes[_token].add(fundingInterval) > block.timestamp) { return 0; }
 
         uint256 intervals = block.timestamp.sub(lastFundingTimes[_token]).div(fundingInterval);
-        uint256 balance = IERC20(_token).balanceOf(address(this));
-        if (balance == 0) {
-            return 0;
-        }
-        return fundingRateFactor.mul(reservedAmounts[_token]).mul(intervals).div(balance);
+        uint256 poolAmount = poolAmounts[_token];
+        if (poolAmount == 0) { return 0; }
+
+        return fundingRateFactor.mul(reservedAmounts[_token]).mul(intervals).div(poolAmount);
+    }
+
+    function getUtilisation(address _token) public view returns (uint256) {
+        uint256 poolAmount = poolAmounts[_token];
+        if (poolAmount == 0) { return 0; }
+
+        return reservedAmounts[_token].mul(FUNDING_RATE_PRECISION).div(poolAmount);
     }
 
     function getPositionLeverage(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256) {
@@ -700,6 +704,13 @@ contract Vault is ReentrancyGuard, IVault {
         Position memory position = positions[key];
         require(position.collateral > 0, "Vault: invalid position");
         return position.size.mul(BASIS_POINTS_DIVISOR).div(position.collateral);
+    }
+
+    function getNextAveragePrice(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong, uint256 _nextPrice, uint256 _sizeDelta) public view returns (uint256) {
+        (bool hasProfit, uint256 delta) = getDelta(_indexToken, _size, _averagePrice, _isLong);
+        uint256 nextSize = _size.add(_sizeDelta);
+        uint256 divisor = hasProfit ? nextSize.add(delta) : nextSize.sub(delta);
+        return _nextPrice.mul(nextSize).div(divisor);
     }
 
     function getPositionDelta(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (bool, uint256) {
