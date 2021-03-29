@@ -375,7 +375,7 @@ contract Vault is ReentrancyGuard, IVault {
         _validatePosition(position.size, position.collateral);
         validateLiquidation(_account, _collateralToken, _indexToken, _isLong, true);
 
-        // reserve tokens to pay the profits on the position
+        // reserve tokens to pay profits on the position
         uint256 reserveDelta = usdToTokenMax(_collateralToken, _sizeDelta);
         position.reserveAmount = position.reserveAmount.add(reserveDelta);
         _increaseReservedAmount(_collateralToken, reserveDelta);
@@ -406,9 +406,13 @@ contract Vault is ReentrancyGuard, IVault {
         require(position.size > 0, "Vault: empty position");
         require(position.size >= _sizeDelta, "Vault: position size exceeded");
 
+        uint256 collateral = position.collateral;
+        // scrop variables to avoid stack too deep errors
+        {
         uint256 reserveDelta = position.reserveAmount.mul(_sizeDelta).div(position.size);
         position.reserveAmount = position.reserveAmount.sub(reserveDelta);
         _decreaseReservedAmount(_collateralToken, reserveDelta);
+        }
 
         (uint256 usdOut, uint256 usdOutAfterFee) = _reduceCollateral(_account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
 
@@ -418,12 +422,15 @@ contract Vault is ReentrancyGuard, IVault {
 
             _validatePosition(position.size, position.collateral);
             validateLiquidation(_account, _collateralToken, _indexToken, _isLong, true);
-        } else {
-            delete positions[key];
-        }
 
-        if (_isLong) {
+            if (_isLong) {
+                _increaseGuaranteedUsd(_collateralToken, collateral.sub(position.collateral));
+                _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
+            }
+        } else {
+            _increaseGuaranteedUsd(_collateralToken, collateral);
             _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
+            delete positions[key];
         }
 
         emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
@@ -456,7 +463,7 @@ contract Vault is ReentrancyGuard, IVault {
 
         _decreaseReservedAmount(_collateralToken, position.reserveAmount);
         if (_isLong) {
-            _decreaseGuaranteedUsd(_collateralToken, position.size);
+            _decreaseGuaranteedUsd(_collateralToken, position.size.sub(position.collateral));
         }
 
         emit LiquidatePosition(key, _account, _collateralToken, _indexToken, _isLong, position.size, position.collateral, position.reserveAmount);
@@ -967,6 +974,11 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function _decreaseGuaranteedUsd(address _token, uint256 _usdAmount) private {
+        if (_usdAmount >= guaranteedUsd[_token]) {
+            emit DecreaseGuaranteedUsd(_token, guaranteedUsd[_token]);
+            guaranteedUsd[_token] = 0;
+            return;
+        }
         guaranteedUsd[_token] = guaranteedUsd[_token].sub(_usdAmount);
         emit DecreaseGuaranteedUsd(_token, _usdAmount);
     }
