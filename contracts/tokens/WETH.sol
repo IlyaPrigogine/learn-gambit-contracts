@@ -29,7 +29,7 @@ import "../libraries/math/SafeMath.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract FaucetToken is IERC20 {
+contract WETH is IERC20 {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;

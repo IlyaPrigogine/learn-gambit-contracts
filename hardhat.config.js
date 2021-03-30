@@ -30,7 +30,7 @@ module.exports = {
       gasPrice: 20000000000,
       accounts: [BSC_DEPLOY_KEY]
     },
-    bsctestnet: {
+    testnet: {
       url: BSC_TESTNET_URL,
       chainId: 97,
       gasPrice: 20000000000,
