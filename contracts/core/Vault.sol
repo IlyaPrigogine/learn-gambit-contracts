@@ -157,6 +157,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function initialize(
+        address _router,
         address _usdg,
         uint256 _maxUsdg,
         uint256 _liquidationFeeUsd,
@@ -165,6 +166,7 @@ contract Vault is ReentrancyGuard, IVault {
         require(!isInitialized, "Vault: already initialized");
         isInitialized = true;
 
+        router = _router;
         usdg = _usdg;
         maxUsdg = _maxUsdg;
         liquidationFeeUsd = _liquidationFeeUsd;

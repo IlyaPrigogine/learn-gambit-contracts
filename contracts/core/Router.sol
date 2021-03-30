@@ -60,10 +60,10 @@ contract Router {
     mapping (bytes32 => IncreasePositionOrder) public increasePositionOrders;
     mapping (bytes32 => DecreasePositionOrder) public decreasePositionOrders;
 
-    constructor(address _weth, address _usdg, address _vault) public {
-        weth = _weth;
-        usdg = _usdg;
+    constructor(address _vault, address _usdg, address _weth) public {
         vault = _vault;
+        usdg = _usdg;
+        weth = _weth;
     }
 
     receive() external payable {}

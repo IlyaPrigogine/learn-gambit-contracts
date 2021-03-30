@@ -2,7 +2,8 @@ require("@nomiclabs/hardhat-waffle")
 require("@nomiclabs/hardhat-etherscan")
 require("hardhat-contract-sizer")
 
-const { BSC_URL, BSC_DEPLOY_KEY, BSCSCAN_API_KEY } = require("./env.json")
+const { BSC_URL, BSC_DEPLOY_KEY, BSCSCAN_API_KEY,
+  BSC_TESTNET_URL, BSC_TESTNET_DEPLOY_KEY } = require("./env.json")
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -28,6 +29,12 @@ module.exports = {
       chainId: 56,
       gasPrice: 20000000000,
       accounts: [BSC_DEPLOY_KEY]
+    },
+    bsctestnet: {
+      url: BSC_TESTNET_URL,
+      chainId: 97,
+      gasPrice: 20000000000,
+      accounts: [BSC_TESTNET_DEPLOY_KEY]
     }
   },
   etherscan: {

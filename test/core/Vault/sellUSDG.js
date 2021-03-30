@@ -12,6 +12,7 @@ describe("Vault.sellUSDG", function () {
   const [wallet, user0, user1, user2, user3] = provider.getWallets()
   let vault
   let usdg
+  let router
   let bnb
   let bnbPriceFeed
   let btc
@@ -22,10 +23,6 @@ describe("Vault.sellUSDG", function () {
   let yieldTracker0
 
   beforeEach(async () => {
-    vault = await deployContract("Vault", [])
-    usdg = await deployContract("USDG", [vault.address])
-    await vault.initialize(usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
-
     bnb = await deployContract("Token", [])
     bnbPriceFeed = await deployContract("PriceFeed", [])
 
@@ -34,6 +31,12 @@ describe("Vault.sellUSDG", function () {
 
     dai = await deployContract("Token", [])
     daiPriceFeed = await deployContract("PriceFeed", [])
+
+    vault = await deployContract("Vault", [])
+    usdg = await deployContract("USDG", [vault.address])
+    router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
+
+    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
