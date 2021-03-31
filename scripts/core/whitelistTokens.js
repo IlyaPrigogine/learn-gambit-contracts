@@ -2,7 +2,7 @@ const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
-  const vault = await contractAt("Vault", "0xD1e15B7f2AAa9B67008B983BF863272C5610408C")
+  const vault = await contractAt("Vault", "0x1c7D2dfA7FEc362316a113970b6c53EC62A1C2c2")
 
   const btc = { address: "0xBc9BC47A7aB63db1E0030dC7B60DDcDe29CF4Ffb" }
   const eth = { address: "0xBCDCaF67193Bf5C57be08623278fCB69f4cA9e68" }
@@ -36,7 +36,7 @@ async function main() {
     8, // _priceDecimals
     18, // _tokenDecimals
     10000, // _redemptionBps
-    75, // _minProfitBps
+    125, // _minProfitBps
     false // _isStable
   ), "vault.setTokenConfig(bnb)")
 
@@ -46,7 +46,7 @@ async function main() {
     8, // _priceDecimals
     18, // _tokenDecimals
     9000, // _redemptionBps
-    75, // _minProfitBps
+    125, // _minProfitBps
     false // _isStable
   ), "vault.setTokenConfig(bnb)")
 
@@ -56,7 +56,7 @@ async function main() {
     8, // _priceDecimals
     18, // _tokenDecimals
     9000, // _redemptionBps
-    75, // _minProfitBps
+    125, // _minProfitBps
     true // _isStable
   ), "vault.setTokenConfig(busd)")
 }

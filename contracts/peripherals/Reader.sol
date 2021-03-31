@@ -18,7 +18,7 @@ contract Reader {
         return balances;
     }
 
-    function getVaultTokenInfo(address _vault, address[] memory _tokens) public view returns (uint256[] memory) {
+    function getVaultTokenInfo(address _vault, address[] memory _tokens, uint256 usdgAmount) public view returns (uint256[] memory) {
         uint256 propsLength = 6;
         IVault vault = IVault(_vault);
 
@@ -28,7 +28,7 @@ contract Reader {
             amounts[i * propsLength] = vault.poolAmounts(token);
             amounts[i * propsLength + 1] = vault.reservedAmounts(token);
             amounts[i * propsLength + 2] = vault.usdgAmounts(token);
-            amounts[i * propsLength + 3] = vault.getRedemptionAmount(token, 10 ** 30);
+            amounts[i * propsLength + 3] = vault.getRedemptionAmount(token, usdgAmount);
             amounts[i * propsLength + 4] = vault.getMinPrice(token);
             amounts[i * propsLength + 5] = vault.getMaxPrice(token);
         }

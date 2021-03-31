@@ -289,6 +289,7 @@ contract Vault is ReentrancyGuard, IVault {
         updateCumulativeFundingRate(_token);
 
         uint256 redemptionAmount = getRedemptionAmount(_token, usdgAmount);
+        require(redemptionAmount > 0, "Vault: invalid redemptionAmount");
 
         _decreaseUsdgAmount(_token, usdgAmount);
         _decreasePoolAmount(_token, redemptionAmount);
@@ -596,7 +597,7 @@ contract Vault is ReentrancyGuard, IVault {
         }
 
         uint256 redemptionCollateral = getRedemptionCollateral(_token);
-        require(redemptionCollateral > 0, "Vault: empty collateral");
+        if (redemptionCollateral == 0) { return 0; }
 
         uint256 totalUsdgAmount = usdgAmounts[_token];
 
