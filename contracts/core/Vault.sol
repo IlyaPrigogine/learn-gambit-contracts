@@ -67,14 +67,14 @@ contract Vault is ReentrancyGuard, IVault {
     mapping (address => uint256) public tokenBalances;
 
     // usdgAmounts tracks the amount of USDG debt for each whitelisted token
-    mapping (address => uint256) public usdgAmounts;
+    mapping (address => uint256) public override usdgAmounts;
 
     // poolAmounts tracks the number of received tokens that can be used for leverage
     // this is tracked separately from tokenBalances to exclude funds that are deposited as margin collateral
-    mapping (address => uint256) public poolAmounts;
+    mapping (address => uint256) public override poolAmounts;
 
     // reservedAmounts tracks the number of tokens reserved for open leverage positions
-    mapping (address => uint256) public reservedAmounts;
+    mapping (address => uint256) public override reservedAmounts;
 
     // guaranteedUsd tracks the amount of USD that is "guaranteed" by opened leverage positions
     // this value is used to calculate the redemption values for selling of USDG
@@ -586,7 +586,7 @@ contract Vault is ReentrancyGuard, IVault {
         return 10 ** decimals;
     }
 
-    function getRedemptionAmount(address _token, uint256 _usdgAmount) public view returns (uint256) {
+    function getRedemptionAmount(address _token, uint256 _usdgAmount) public override view returns (uint256) {
         uint256 price = getMaxPrice(_token);
         // calculate the price based redemption amount
         uint256 redemptionAmount = _usdgAmount.mul(PRICE_PRECISION).div(price);
