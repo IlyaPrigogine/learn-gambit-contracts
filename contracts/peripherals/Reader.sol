@@ -18,7 +18,7 @@ contract Reader {
         return balances;
     }
 
-    function getVaultTokenInfo(address _vault, address[] memory _tokens, uint256 usdgAmount) public view returns (uint256[] memory) {
+    function getVaultTokenInfo(address _vault, uint256 usdgAmount, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256 propsLength = 6;
         IVault vault = IVault(_vault);
 

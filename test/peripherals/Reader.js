@@ -74,7 +74,7 @@ describe("Reader", function () {
       false // _isStable
     )
 
-    const results = await reader.getVaultTokenInfo(vault.address, [btc.address, dai.address], expandDecimals(1, 30))
+    const results = await reader.getVaultTokenInfo(vault.address, expandDecimals(1, 30), [btc.address, dai.address])
     expect(await results.length).eq(12)
   })
 })

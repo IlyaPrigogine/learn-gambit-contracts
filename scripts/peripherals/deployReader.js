@@ -1,4 +1,4 @@
-const { deployContract } = require("../shared/helpers")
+const { deployContract, contractAt } = require("../shared/helpers")
 
 async function main() {
   await deployContract("Reader", [])
