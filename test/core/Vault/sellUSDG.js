@@ -97,7 +97,7 @@ describe("Vault.sellUSDG", function () {
     await usdg.connect(user0).transfer(vault.address, 15000)
 
     await expect(vault.connect(user0).sellUSDG(btc.address, user1.address))
-      .to.be.revertedWith("Vault: empty collateral")
+      .to.be.revertedWith("Vault: invalid redemptionAmount")
 
     const tx = await vault.connect(user0).sellUSDG(bnb.address, user1.address)
     await reportGasUsed(provider, tx, "sellUSDG gas used")
