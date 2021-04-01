@@ -10,11 +10,11 @@ import "../core/interfaces/IVault.sol";
 contract Reader {
     using SafeMath for uint256;
 
-    function getTokenBalances(address _account, address _weth, address[] memory _tokens) public view returns (uint256[] memory) {
+    function getTokenBalances(address _account, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory balances = new uint256[](_tokens.length);
         for (uint256 i = 0; i < _tokens.length; i++) {
             address token = _tokens[i];
-            if (token == _weth) {
+            if (token == address(0)) {
                 balances[i] = _account.balance;
                 continue;
             }
