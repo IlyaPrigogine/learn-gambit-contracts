@@ -111,7 +111,7 @@ contract Router {
         uint256 _price,
         uint256 _nonce,
         uint256 _relayerFee
-    ) external payable {
+    ) external {
         bytes32 id = getId(_sender(), _nonce);
         increasePositionOrders[id] = IncreasePositionOrder(
             _sender(),
@@ -155,7 +155,7 @@ contract Router {
         uint256 _relayerFee,
         TriggerType _triggerType,
         uint256 _triggerPrice
-    ) external payable {
+    ) external {
         bytes32 id = getId(_sender(), _nonce);
         decreasePositionOrders[id] = DecreasePositionOrder(
             _sender(),
