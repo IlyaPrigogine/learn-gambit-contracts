@@ -6,6 +6,7 @@ pragma solidity 0.6.12;
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
+import "../libraries/utils/Address.sol";
 
 import "../tokens/interfaces/IWETH.sol";
 import "./interfaces/IVault.sol";
@@ -13,6 +14,7 @@ import "./interfaces/IVault.sol";
 contract Router {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    using Address for address payable;
 
     enum TriggerType { None, AboveTriggerPrice, BelowTriggerPrice, Trailing }
 
@@ -217,7 +219,7 @@ contract Router {
         _swap(_path, _minOut, _receiver);
     }
 
-    function swapTokensToETH(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) external {
+    function swapTokensToETH(address[] memory _path, uint256 _amountIn, uint256 _minOut, address payable _receiver) external {
         require(_path[_path.length - 1] == weth, "Router: invalid _path");
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         uint256 amountOut = _swap(_path, _minOut, address(this));
@@ -245,7 +247,7 @@ contract Router {
         _decreasePosition(_collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, _receiver, _price);
     }
 
-    function decreasePositionETH(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver, uint256 _price) external {
+    function decreasePositionETH(address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address payable _receiver, uint256 _price) external {
         uint256 amountOut = _decreasePosition(_collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, _receiver, _price);
         _transferOutETH(amountOut, _receiver);
     }
@@ -282,9 +284,9 @@ contract Router {
         IERC20(weth).safeTransfer(vault, msg.value);
     }
 
-    function _transferOutETH(uint256 _amountOut, address _receiver) private {
+    function _transferOutETH(uint256 _amountOut, address payable _receiver) private {
         IWETH(weth).withdraw(_amountOut);
-        IERC20(weth).safeTransfer(_receiver, _amountOut);
+        _receiver.sendValue(_amountOut);
     }
 
     function _swap(address[] memory _path, uint256 _minOut, address _receiver) private returns (uint256) {
