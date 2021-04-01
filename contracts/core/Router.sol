@@ -206,7 +206,7 @@ contract Router {
         delete increasePositionOrders[_id];
     }
 
-    function swap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) public payable {
+    function swap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) public {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         _swap(_path, _minOut, _receiver);
     }
