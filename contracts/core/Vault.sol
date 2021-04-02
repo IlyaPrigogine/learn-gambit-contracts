@@ -22,7 +22,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 averagePrice;
         uint256 entryFundingRate;
         uint256 reserveAmount;
-        int256 pnl;
+        int256 realisedPnl;
     }
 
     uint256 constant BASIS_POINTS_DIVISOR = 10000;
@@ -675,11 +675,11 @@ contract Vault is ReentrancyGuard, IVault {
         return _usdAmount.mul(10 ** decimals).div(_price);
     }
 
-    function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) public view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool) {
+    function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) public override view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool) {
         bytes32 key = getPositionKey(_account, _collateralToken, _indexToken, _isLong);
         Position memory position = positions[key];
-        uint256 pnl = position.pnl > 0 ? uint256(position.pnl) : uint256(-position.pnl);
-        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, pnl, position.pnl >= 0);
+        uint256 realisedPnl = position.realisedPnl > 0 ? uint256(position.realisedPnl) : uint256(-position.realisedPnl);
+        return (position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, realisedPnl, position.realisedPnl >= 0);
     }
 
     function getPositionKey(address _account, address _collateralToken, address _indexToken, bool _isLong) public pure returns (bytes32) {
@@ -745,7 +745,7 @@ contract Vault is ReentrancyGuard, IVault {
         return getDelta(_indexToken, position.size, position.averagePrice, _isLong);
     }
 
-    function getDelta(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong) public view returns (bool, uint256) {
+    function getDelta(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong) public override view returns (bool, uint256) {
         require(_averagePrice > 0, "Vault: invalid _averagePrice");
         uint256 price = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
         uint256 priceDelta = _averagePrice > price ? _averagePrice.sub(price) : price.sub(_averagePrice);
@@ -805,7 +805,7 @@ contract Vault is ReentrancyGuard, IVault {
         // transfer profits out
         if (hasProfit && adjustedDelta > 0) {
             usdOut = adjustedDelta;
-            position.pnl = position.pnl + int256(adjustedDelta);
+            position.realisedPnl = position.realisedPnl + int256(adjustedDelta);
 
             // pay out realised profits from the pool amount for short positions
             if (!_isLong) {
@@ -825,7 +825,7 @@ contract Vault is ReentrancyGuard, IVault {
                 _increasePoolAmount(_collateralToken, tokenAmount);
             }
 
-            position.pnl = position.pnl - int256(adjustedDelta);
+            position.realisedPnl = position.realisedPnl - int256(adjustedDelta);
         }
 
         // reduce the position's collateral by _collateralDelta
