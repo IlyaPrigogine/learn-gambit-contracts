@@ -134,7 +134,7 @@ contract Router {
             IERC20(order.path[0]).safeTransferFrom(order.account, vault, order.amountIn.sub(order.relayerFee));
         }
         if (order.path.length > 1) {
-            _swap(order.path, type(uint256).max, vault);
+            _swap(order.path, 0, vault);
         }
         _increasePosition(order.path[order.path.length - 1], order.indexToken, order.sizeDelta, order.isLong, order.price);
 
@@ -226,19 +226,19 @@ contract Router {
         _transferOutETH(amountOut, _receiver);
     }
 
-    function increasePosition(address[] memory _path, address _indexToken, uint256 _amountIn, uint256 _sizeDelta, bool _isLong, uint256 _price) external {
+    function increasePosition(address[] memory _path, address _indexToken, uint256 _amountIn, uint256 _minOut, uint256 _sizeDelta, bool _isLong, uint256 _price) external {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         if (_path.length > 1) {
-            _swap(_path, type(uint256).max, vault);
+            _swap(_path, _minOut, vault);
         }
         _increasePosition(_path[_path.length - 1], _indexToken, _sizeDelta, _isLong, _price);
     }
 
-    function increasePositionETH(address[] memory _path, address _indexToken, uint256 _sizeDelta, bool _isLong, uint256 _price) external payable {
+    function increasePositionETH(address[] memory _path, address _indexToken, uint256 _minOut, uint256 _sizeDelta, bool _isLong, uint256 _price) external payable {
         require(_path[0] == weth, "Router: invalid _path");
         _transferETHToVault();
         if (_path.length > 1) {
-            _swap(_path, type(uint256).max, vault);
+            _swap(_path, _minOut, vault);
         }
         _increasePosition(_path[_path.length - 1], _indexToken, _sizeDelta, _isLong, _price);
     }
@@ -294,7 +294,7 @@ contract Router {
             return _vaultSwap(_path[0], _path[1], _minOut, _receiver);
         }
         if (_path.length == 3) {
-            _vaultSwap(_path[0], _path[1], type(uint256).max, vault);
+            _vaultSwap(_path[0], _path[1], 0, vault);
             return _vaultSwap(_path[1], _path[2], _minOut, _receiver);
         }
 
