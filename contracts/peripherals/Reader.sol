@@ -48,7 +48,6 @@ contract Reader {
         uint256[] memory amounts = new uint256[](_collateralTokens.length * propsLength);
 
         for (uint256 i = 0; i < _collateralTokens.length; i++) {
-
             {
             (uint256 size,
              uint256 collateral,
