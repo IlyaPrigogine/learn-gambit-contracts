@@ -51,7 +51,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public marginFeeBasisPoints = 10; // 0.1%
 
     uint256 public fundingInterval = 8 hours;
-    uint256 public fundingRateFactor;
+    uint256 public override fundingRateFactor;
 
     mapping (address => mapping (address => bool)) public approvedRouters;
 

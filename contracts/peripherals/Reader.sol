@@ -10,6 +10,26 @@ import "../core/interfaces/IVault.sol";
 contract Reader {
     using SafeMath for uint256;
 
+    function getFundingRates(address _vault, address _weth, address[] memory _tokens) public view returns (uint256[] memory) {
+        uint256[] memory fundingRates = new uint256[](_tokens.length);
+        IVault vault = IVault(_vault);
+        uint256 fundingRateFactor = vault.fundingRateFactor();
+
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            address token = _tokens[i];
+            if (token == address(0)) {
+                token = _weth;
+            }
+            uint256 reservedAmount = vault.reservedAmounts(token);
+            uint256 poolAmount = vault.poolAmounts(token);
+            if (poolAmount > 0) {
+                fundingRates[i] = fundingRateFactor.mul(reservedAmount).div(poolAmount);
+            }
+        }
+
+        return fundingRates;
+    }
+
     function getTokenBalances(address _account, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory balances = new uint256[](_tokens.length);
         for (uint256 i = 0; i < _tokens.length; i++) {
