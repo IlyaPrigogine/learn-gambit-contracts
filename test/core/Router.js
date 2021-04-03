@@ -71,6 +71,17 @@ describe("Router", function () {
       75, // _minProfitBps
       false // _isStable
     )
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await vault.setTokenConfig(
+      bnb.address, // _token
+      bnbPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      18, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
+      false // _isStable
+    )
   })
 
   it("swap, buy USDG", async () => {
@@ -82,7 +93,8 @@ describe("Router", function () {
 
     expect(await dai.balanceOf(user0.address)).eq(expandDecimals(200, 18))
     expect(await usdg.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).swap([dai.address, usdg.address], expandDecimals(200, 18), expandDecimals(199, 18), user0.address)
+    const tx = await router.connect(user0).swap([dai.address, usdg.address], expandDecimals(200, 18), expandDecimals(199, 18), user0.address)
+    await reportGasUsed(provider, tx, "buyUSDG gas used")
     expect(await dai.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user0.address)).eq("199400000000000000000") // 199.4
   })
@@ -96,7 +108,8 @@ describe("Router", function () {
 
     expect(await dai.balanceOf(user0.address)).eq(expandDecimals(200, 18))
     expect(await usdg.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).swap([dai.address, usdg.address], expandDecimals(200, 18), expandDecimals(199, 18), user0.address)
+    const tx = await router.connect(user0).swap([dai.address, usdg.address], expandDecimals(200, 18), expandDecimals(199, 18), user0.address)
+    await reportGasUsed(provider, tx, "sellUSDG gas used")
     expect(await dai.balanceOf(user0.address)).eq(0)
     expect(await usdg.balanceOf(user0.address)).eq("199400000000000000000") // 199.4
 
@@ -123,8 +136,45 @@ describe("Router", function () {
 
     expect(await dai.balanceOf(user0.address)).eq(expandDecimals(30000, 18))
     expect(await btc.balanceOf(user0.address)).eq(0)
-    await router.connect(user0).swap([dai.address, btc.address], expandDecimals(30000, 18), "49000000", user0.address)
+    const tx = await router.connect(user0).swap([dai.address, btc.address], expandDecimals(30000, 18), "49000000", user0.address)
+    await reportGasUsed(provider, tx, "swap gas used")
     expect(await dai.balanceOf(user0.address)).eq(0)
     expect(await btc.balanceOf(user0.address)).eq("49850000") // 0.4985
+  })
+
+  it("swap, path.length == 3", async () => {
+    await btc.mint(user0.address, expandDecimals(1, 8))
+    await btc.connect(user0).approve(router.address, expandDecimals(1, 8))
+    await router.connect(user0).swap([btc.address, usdg.address], expandDecimals(1, 8), expandDecimals(59000, 18), user0.address)
+
+    await dai.mint(user0.address, expandDecimals(30000, 18))
+    await dai.connect(user0).approve(router.address, expandDecimals(30000, 18))
+    await router.connect(user0).swap([dai.address, usdg.address], expandDecimals(30000, 18), expandDecimals(29000, 18), user0.address)
+
+    await usdg.connect(user0).approve(router.address, expandDecimals(20000, 18))
+
+    expect(await dai.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user0.address)).eq(expandDecimals(89730, 18))
+    await expect(router.connect(user0).swap([usdg.address, dai.address, usdg.address], expandDecimals(20000, 18), expandDecimals(20000, 18), user0.address))
+      .to.be.revertedWith("Router: insufficient amountOut")
+
+    await router.connect(user0).swap([usdg.address, dai.address, usdg.address], expandDecimals(20000, 18), expandDecimals(19000, 18), user0.address)
+    expect(await dai.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user0.address)).eq("89610180000000000000000") // 89610.18
+
+    await usdg.connect(user0).approve(router.address, expandDecimals(40000, 18))
+    await expect(router.connect(user0).swap([usdg.address, dai.address, btc.address], expandDecimals(30000, 18), expandDecimals(39000, 18), user0.address))
+      .to.be.revertedWith("Vault: poolAmount exceeded") // this reverts as some DAI has been transferred from the pool to the fee reserve
+
+    expect(await vault.poolAmounts(dai.address)).eq("29790180000000000000000") // 29790.18
+    expect(await vault.feeReserves(dai.address)).eq("209820000000000000000") // 209.82
+
+    await expect(router.connect(user0).swap([usdg.address, dai.address, btc.address], expandDecimals(20000, 18), "34000000", user0.address))
+      .to.be.revertedWith("Router: insufficient amountOut")
+
+    const tx = await router.connect(user0).swap([usdg.address, dai.address, btc.address], expandDecimals(20000, 18), "33000000", user0.address)
+    await reportGasUsed(provider, tx, "swap gas used")
+    expect(await usdg.balanceOf(user0.address)).eq("69610180000000000000000") // 69610.18
+    expect(await btc.balanceOf(user0.address)).eq("33133633") // 0.33133633 BTC
   })
 })

@@ -294,7 +294,8 @@ contract Router {
             return _vaultSwap(_path[0], _path[1], _minOut, _receiver);
         }
         if (_path.length == 3) {
-            _vaultSwap(_path[0], _path[1], 0, vault);
+            uint256 midOut = _vaultSwap(_path[0], _path[1], 0, address(this));
+            IERC20(_path[1]).safeTransfer(vault, midOut);
             return _vaultSwap(_path[1], _path[2], _minOut, _receiver);
         }
 
