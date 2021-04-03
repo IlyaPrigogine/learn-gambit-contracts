@@ -11,7 +11,8 @@ contract Reader {
     using SafeMath for uint256;
 
     function getFundingRates(address _vault, address _weth, address[] memory _tokens) public view returns (uint256[] memory) {
-        uint256[] memory fundingRates = new uint256[](_tokens.length);
+        uint256 propsLength = 2;
+        uint256[] memory fundingRates = new uint256[](_tokens.length * propsLength);
         IVault vault = IVault(_vault);
         uint256 fundingRateFactor = vault.fundingRateFactor();
 
@@ -22,8 +23,15 @@ contract Reader {
             }
             uint256 reservedAmount = vault.reservedAmounts(token);
             uint256 poolAmount = vault.poolAmounts(token);
+
             if (poolAmount > 0) {
-                fundingRates[i] = fundingRateFactor.mul(reservedAmount).div(poolAmount);
+                fundingRates[i * propsLength] = fundingRateFactor.mul(reservedAmount).div(poolAmount);
+            }
+
+            if (vault.cumulativeFundingRates(token) > 0) {
+                uint256 nextRate = vault.getNextFundingRate(token);
+                uint256 baseRate = vault.cumulativeFundingRates(token);
+                fundingRates[i * propsLength + 1] = baseRate.add(nextRate);
             }
         }
 

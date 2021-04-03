@@ -10,6 +10,9 @@ interface IVault {
     function decreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external returns (uint256);
 
     function fundingRateFactor() external view returns (uint256);
+    function cumulativeFundingRates(address _token) external view returns (uint256);
+    function getNextFundingRate(address _token) external view returns (uint256);
+
     function poolAmounts(address _token) external view returns (uint256);
     function reservedAmounts(address _token) external view returns (uint256);
     function usdgAmounts(address _token) external view returns (uint256);

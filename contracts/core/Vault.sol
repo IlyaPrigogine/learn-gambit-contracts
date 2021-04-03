@@ -83,7 +83,7 @@ contract Vault is ReentrancyGuard, IVault {
     // after liquidations are carried out
     mapping (address => uint256) public guaranteedUsd;
 
-    mapping (address => uint256) public cumulativeFundingRates;
+    mapping (address => uint256) public override cumulativeFundingRates;
     mapping (address => uint256) public lastFundingTimes;
 
     mapping (bytes32 => Position) public positions;
@@ -708,7 +708,7 @@ contract Vault is ReentrancyGuard, IVault {
         emit UpdateFundingRate(_token, cumulativeFundingRates[_token]);
     }
 
-    function getNextFundingRate(address _token) public view returns (uint256) {
+    function getNextFundingRate(address _token) public override view returns (uint256) {
         if (lastFundingTimes[_token].add(fundingInterval) > block.timestamp) { return 0; }
 
         uint256 intervals = block.timestamp.sub(lastFundingTimes[_token]).div(fundingInterval);
