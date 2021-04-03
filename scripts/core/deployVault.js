@@ -7,10 +7,10 @@ async function main() {
   const vault = await deployContract("Vault", [])
   const usdg = await deployContract("USDG", [vault.address])
   const router = await deployContract("Router", [vault.address, usdg.address, weth.address])
-  // const vault = await contractAt("Vault", "0xD1e15B7f2AAa9B67008B983BF863272C5610408C")
-  // const usdg = await contractAt("USDG", "0xFd0004f20bDF57f39c6999e7af02131b8402F4c2")
+  // const vault = await contractAt("Vault", "0x5F58D97B9eAc7093bD1801b4fa51B0f555A8DAD4")
+  // const usdg = await contractAt("USDG", "0x2FFB16692eB2a875190C32c36B9E20A8c7e477a6")
   // const router = await contractAt("Router", "0xb4f81Fa74e06b5f762A104e47276BA9b2929cb27")
-  await sendTxn(vault.initialize(router.address, usdg.address, expandDecimals(2000 * 1000, 18), toUsd(5), 600), "vault.initialize")
+  // await sendTxn(vault.initialize(router.address, usdg.address, expandDecimals(2000 * 1000, 18), toUsd(5), 600), "vault.initialize")
 }
 
 main()

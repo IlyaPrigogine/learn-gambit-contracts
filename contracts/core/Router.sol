@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.6.12;
@@ -130,11 +129,10 @@ contract Router {
     function execIncreasePosition(bytes32 _id) external {
         IncreasePositionOrder memory order = increasePositionOrders[_id];
         IERC20(order.path[0]).safeTransferFrom(order.account, msg.sender, order.relayerFee);
-        if (order.amountIn > order.relayerFee) {
-            IERC20(order.path[0]).safeTransferFrom(order.account, vault, order.amountIn.sub(order.relayerFee));
-        }
+        IERC20(order.path[0]).safeTransferFrom(order.account, vault, order.amountIn.sub(order.relayerFee));
         if (order.path.length > 1) {
-            _swap(order.path, 0, vault);
+            uint256 amountOut = _swap(order.path, 0, address(this));
+            IERC20(order.path[order.path.length - 1]).safeTransfer(vault, amountOut);
         }
         _increasePosition(order.path[order.path.length - 1], order.indexToken, order.sizeDelta, order.isLong, order.price);
 
@@ -229,7 +227,8 @@ contract Router {
     function increasePosition(address[] memory _path, address _indexToken, uint256 _amountIn, uint256 _minOut, uint256 _sizeDelta, bool _isLong, uint256 _price) external {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         if (_path.length > 1) {
-            _swap(_path, _minOut, vault);
+            uint256 amountOut = _swap(_path, _minOut, address(this));
+            IERC20(_path[_path.length - 1]).safeTransfer(vault, amountOut);
         }
         _increasePosition(_path[_path.length - 1], _indexToken, _sizeDelta, _isLong, _price);
     }
@@ -238,7 +237,8 @@ contract Router {
         require(_path[0] == weth, "Router: invalid _path");
         _transferETHToVault();
         if (_path.length > 1) {
-            _swap(_path, _minOut, vault);
+            uint256 amountOut = _swap(_path, _minOut, address(this));
+            IERC20(_path[_path.length - 1]).safeTransfer(vault, amountOut);
         }
         _increasePosition(_path[_path.length - 1], _indexToken, _sizeDelta, _isLong, _price);
     }
