@@ -225,8 +225,10 @@ contract Router {
     }
 
     function increasePosition(address[] memory _path, address _indexToken, uint256 _amountIn, uint256 _minOut, uint256 _sizeDelta, bool _isLong, uint256 _price) external {
-        IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
-        if (_path.length > 1) {
+        if (_amountIn > 0) {
+            IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
+        }
+        if (_path.length > 1 && _amountIn > 0) {
             uint256 amountOut = _swap(_path, _minOut, address(this));
             IERC20(_path[_path.length - 1]).safeTransfer(vault, amountOut);
         }
@@ -235,8 +237,10 @@ contract Router {
 
     function increasePositionETH(address[] memory _path, address _indexToken, uint256 _minOut, uint256 _sizeDelta, bool _isLong, uint256 _price) external payable {
         require(_path[0] == weth, "Router: invalid _path");
-        _transferETHToVault();
-        if (_path.length > 1) {
+        if (msg.value > 0) {
+            _transferETHToVault();
+        }
+        if (_path.length > 1 && msg.value > 0) {
             uint256 amountOut = _swap(_path, _minOut, address(this));
             IERC20(_path[_path.length - 1]).safeTransfer(vault, amountOut);
         }
