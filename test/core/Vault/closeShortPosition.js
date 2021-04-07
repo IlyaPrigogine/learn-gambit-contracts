@@ -86,6 +86,7 @@ describe("Vault.closeShortPosition", function () {
     await dai.mint(user0.address, expandDecimals(1000, 18))
     await dai.connect(user0).transfer(vault.address, expandDecimals(100, 18))
     await vault.buyUSDG(dai.address, user1.address)
+    expect(await vault.feeReserves(dai.address)).eq("40000000000000000") // 0.04
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
@@ -113,10 +114,10 @@ describe("Vault.closeShortPosition", function () {
     let leverage = await vault.getPositionLeverage(user0.address, dai.address, btc.address, false)
     expect(leverage).eq(90817) // ~9X leverage
 
-    expect(await vault.feeReserves(dai.address)).eq("390000000000000000") // 0.39
+    expect(await vault.feeReserves(dai.address)).eq("130000000000000000") // 0.13, 0.04 + 0.09
     expect(await vault.reservedAmounts(dai.address)).eq(expandDecimals(90, 18))
     expect(await vault.guaranteedUsd(dai.address)).eq(0)
-    expect(await vault.poolAmounts(dai.address)).eq("99700000000000000000") // 99.7
+    expect(await vault.poolAmounts(dai.address)).eq("99960000000000000000") // 99.96
     expect(await dai.balanceOf(user2.address)).eq(0)
 
     const tx = await vault.connect(user0).decreasePosition(user0.address, dai.address, btc.address, toUsd(3), toUsd(90), false, user2.address)
@@ -131,10 +132,10 @@ describe("Vault.closeShortPosition", function () {
     expect(position[5]).eq(0) // pnl
     expect(position[6]).eq(true) // hasRealisedProfit
 
-    expect(await vault.feeReserves(dai.address)).eq("480000000000000000") // 0.48
+    expect(await vault.feeReserves(dai.address)).eq("220000000000000000") // 0.22, 0.04 + 0.09 + 0.09
     expect(await vault.reservedAmounts(dai.address)).eq(0)
     expect(await vault.guaranteedUsd(dai.address)).eq(0)
-    expect(await vault.poolAmounts(dai.address)).eq("90700000000000000000") // 90.7
+    expect(await vault.poolAmounts(dai.address)).eq("90960000000000000000") // 90.96
     expect(await dai.balanceOf(user2.address)).eq("18820000000000000000") // 18.82
   })
 })

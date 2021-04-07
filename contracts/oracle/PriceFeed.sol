@@ -10,7 +10,14 @@ contract PriceFeed is IPriceFeed {
     string public override description = "PriceFeed";
     address public override aggregator;
 
+    address public gov;
+
     mapping (uint80 => int256) answers;
+
+    constructor() public {
+        gov = msg.sender;
+    }
+
 
     function latestAnswer() public override view returns (int256) {
         return answer;
@@ -21,6 +28,7 @@ contract PriceFeed is IPriceFeed {
     }
 
     function setLatestAnswer(int256 _answer) public {
+        require(msg.sender == gov, "PriceFeed: forbidden");
         roundId = roundId + 1;
         answer = _answer;
         answers[roundId] = _answer;

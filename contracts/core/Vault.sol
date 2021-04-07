@@ -48,6 +48,7 @@ contract Vault is ReentrancyGuard, IVault {
 
     uint256 public liquidationFeeUsd;
     uint256 public swapFeeBasisPoints = 30; // 0.3%
+    uint256 public stableSwapFeeBasisPoints = 4; // 0.04%
     uint256 public marginFeeBasisPoints = 10; // 0.1%
 
     uint256 public fundingInterval = 8 hours;
@@ -191,12 +192,19 @@ contract Vault is ReentrancyGuard, IVault {
         priceSampleSpace = _priceSampleSpace;
     }
 
-    function setFees(uint256 _liquidationFeeUsd, uint256 _swapFeeBasisPoints, uint256 _marginFeeBasisPoints) external nonReentrant onlyGov {
-        require(_liquidationFeeUsd <= MAX_LIQUIDATION_FEE_USD, "Vault: invalid _liquidationFeeUsd");
+    function setFees(
+        uint256 _swapFeeBasisPoints,
+        uint256 _stableSwapFeeBasisPoints,
+        uint256 _marginFeeBasisPoints,
+        uint256 _liquidationFeeUsd
+    ) external nonReentrant onlyGov {
         require(_swapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _swapFeeBasisPoints");
+        require(_stableSwapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _stableSwapFeeBasisPoints");
         require(_marginFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _marginFeeBasisPoints");
+        require(_liquidationFeeUsd <= MAX_LIQUIDATION_FEE_USD, "Vault: invalid _liquidationFeeUsd");
         liquidationFeeUsd = _liquidationFeeUsd;
         swapFeeBasisPoints = _swapFeeBasisPoints;
+        stableSwapFeeBasisPoints = _stableSwapFeeBasisPoints;
         marginFeeBasisPoints = _marginFeeBasisPoints;
     }
 
@@ -264,7 +272,7 @@ contract Vault is ReentrancyGuard, IVault {
 
         uint256 price = getMinPrice(_token);
 
-        uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount);
+        uint256 amountAfterFees = _collectSwapFees(_token, tokenAmount, stableTokens[_token]);
         uint256 usdgAmount = amountAfterFees.mul(price).div(PRICE_PRECISION);
         usdgAmount = adjustForDecimals(usdgAmount, _token, usdg);
         require(usdgAmount > 0, "Vault: invalid usdgAmount");
@@ -296,7 +304,7 @@ contract Vault is ReentrancyGuard, IVault {
 
         IUSDG(usdg).burn(address(this), usdgAmount);
 
-        uint256 tokenAmount = _collectSwapFees(_token, redemptionAmount);
+        uint256 tokenAmount = _collectSwapFees(_token, redemptionAmount, stableTokens[_token]);
         require(tokenAmount > 0, "Vault: invalid tokenAmount");
         _transferOut(_token, tokenAmount, _receiver);
 
@@ -325,7 +333,7 @@ contract Vault is ReentrancyGuard, IVault {
 
         uint256 amountOut = amountIn.mul(priceIn).div(priceOut);
         amountOut = adjustForDecimals(amountOut, _tokenIn, _tokenOut);
-        uint256 amountAfterFees = _collectSwapFees(_tokenOut, amountOut);
+        uint256 amountAfterFees = _collectSwapFees(_tokenOut, amountOut, stableTokens[_tokenIn] && stableTokens[_tokenOut]);
 
         // adjust usdgAmounts by the same usdAmount as debt is shifted between the assets
         uint256 usdAmount = amountIn.mul(priceIn).div(PRICE_PRECISION);
@@ -889,8 +897,9 @@ contract Vault is ReentrancyGuard, IVault {
         require(!stableTokens[_indexToken], "Vault: _indexToken must not be a stableToken");
     }
 
-    function _collectSwapFees(address _token, uint256 _amount) private returns (uint256) {
-        uint256 afterFeeAmount = _amount.mul(BASIS_POINTS_DIVISOR.sub(swapFeeBasisPoints)).div(BASIS_POINTS_DIVISOR);
+    function _collectSwapFees(address _token, uint256 _amount, bool _isStableSwap) private returns (uint256) {
+        uint256 feeBasisPoints = _isStableSwap ? stableSwapFeeBasisPoints : swapFeeBasisPoints;
+        uint256 afterFeeAmount = _amount.mul(BASIS_POINTS_DIVISOR.sub(feeBasisPoints)).div(BASIS_POINTS_DIVISOR);
         uint256 feeAmount = _amount.sub(afterFeeAmount);
         feeReserves[_token] = feeReserves[_token].add(feeAmount);
         emit CollectSwapFees(_token, feeAmount);

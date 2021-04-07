@@ -36,6 +36,7 @@ contract FaucetToken is IERC20 {
 
     address public _gov;
     uint256 public _dropletAmount;
+    bool public _isFaucetEnabled;
 
     mapping (address => uint256) public _claimedAt;
 
@@ -70,15 +71,31 @@ contract FaucetToken is IERC20 {
         _dropletAmount = dropletAmount;
     }
 
-    function claimDroplet() public {
-        require(_claimedAt[msg.sender].add(DROPLET_INTERVAL) <= block.timestamp, "FaucetToken: droplet not available yet");
-        _claimedAt[msg.sender] = block.timestamp;
-        _mint(msg.sender, _dropletAmount);
-    }
-
     function mint(address account, uint256 amount) public {
         require(msg.sender == _gov, "FaucetToken: forbidden");
         _mint(account, amount);
+    }
+
+    function enableFaucet() public {
+        require(msg.sender == _gov, "FaucetToken: forbidden");
+        _isFaucetEnabled = true;
+    }
+
+    function disableFaucet() public {
+        require(msg.sender == _gov, "FaucetToken: forbidden");
+        _isFaucetEnabled = false;
+    }
+
+    function setDropletAmount(uint256 dropletAmount) public {
+        require(msg.sender == _gov, "FaucetToken: forbidden");
+        _dropletAmount = dropletAmount;
+    }
+
+    function claimDroplet() public {
+        require(_isFaucetEnabled, "FaucetToken: faucet not enabled");
+        require(_claimedAt[msg.sender].add(DROPLET_INTERVAL) <= block.timestamp, "FaucetToken: droplet not available yet");
+        _claimedAt[msg.sender] = block.timestamp;
+        _mint(msg.sender, _dropletAmount);
     }
 
     /**
