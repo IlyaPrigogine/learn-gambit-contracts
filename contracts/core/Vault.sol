@@ -100,6 +100,7 @@ contract Vault is ReentrancyGuard, IVault {
         address account,
         address collateralToken,
         address indexToken,
+        uint256 collateralDelta,
         uint256 sizeDelta,
         bool isLong
     );
@@ -401,7 +402,7 @@ contract Vault is ReentrancyGuard, IVault {
             _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, fee));
         }
 
-        emit IncreasePosition(key, _account, _collateralToken, _indexToken, _sizeDelta, _isLong);
+        emit IncreasePosition(key, _account, _collateralToken, _indexToken, collateralDeltaUsd, _sizeDelta, _isLong);
         emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
     }
 
