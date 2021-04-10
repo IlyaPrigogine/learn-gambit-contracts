@@ -2,6 +2,7 @@ const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
+  // TODO: update BTC decimals
   const vault = await contractAt("Vault", "0x96EE5959d640Bf6F7BdEcAf55E65Cb8b5fD09856")
   const busdPriceFeed = { address: "0x532Ea3DffE5a4376Db88AC69484D5d62F277cf98" }
 

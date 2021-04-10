@@ -741,10 +741,17 @@ contract Vault is ReentrancyGuard, IVault {
         return position.size.mul(BASIS_POINTS_DIVISOR).div(position.collateral);
     }
 
+    // for longs: nextAveragePrice = (nextPrice * nextSize)/ (delta + nextSize)
+    // for shorts: nextAveragePrice = (nextPrice * nextSize) / (nextSize - delta)
     function getNextAveragePrice(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong, uint256 _nextPrice, uint256 _sizeDelta) public view returns (uint256) {
         (bool hasProfit, uint256 delta) = getDelta(_indexToken, _size, _averagePrice, _isLong);
         uint256 nextSize = _size.add(_sizeDelta);
-        uint256 divisor = hasProfit ? nextSize.add(delta) : nextSize.sub(delta);
+        uint256 divisor;
+        if (_isLong) {
+            divisor = hasProfit ? nextSize.add(delta) : nextSize.sub(delta);
+        } else {
+            divisor = hasProfit ? nextSize.sub(delta) : nextSize.add(delta);
+        }
         return _nextPrice.mul(nextSize).div(divisor);
     }
 
