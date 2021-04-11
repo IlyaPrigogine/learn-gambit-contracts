@@ -131,6 +131,14 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 entryFundingRate,
         uint256 reserveAmount
     );
+    event ClosePosition(
+        bytes32 key,
+        uint256 size,
+        uint256 collateral,
+        uint256 averagePrice,
+        uint256 entryFundingRate,
+        uint256 reserveAmount
+    );
 
     event UpdateFundingRate(address token, uint256 fundingRate);
     event UpdatePnl(bytes32 key, bool hasProfit, uint256 delta);
@@ -437,16 +445,19 @@ contract Vault is ReentrancyGuard, IVault {
                 _increaseGuaranteedUsd(_collateralToken, collateral.sub(position.collateral));
                 _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
             }
+
+            emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
+            emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
         } else {
             if (_isLong) {
                 _increaseGuaranteedUsd(_collateralToken, collateral);
                 _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
             }
             delete positions[key];
+            emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
+            emit ClosePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
         }
 
-        emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
-        emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
 
         if (usdOut > 0) {
             if (_isLong) {
