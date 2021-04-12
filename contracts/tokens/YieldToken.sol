@@ -27,9 +27,15 @@ contract YieldToken is IERC20, IYieldToken {
 
     address[] public yieldTrackers;
     mapping (address => bool) public nonStakingAccounts;
+    mapping (address => bool) public admins;
 
     modifier onlyGov() {
         require(msg.sender == gov, "YieldToken: forbidden");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(admins[msg.sender], "YieldToken: forbidden");
         _;
     }
 
@@ -37,6 +43,7 @@ contract YieldToken is IERC20, IYieldToken {
         name = _name;
         symbol = _symbol;
         gov = msg.sender;
+        admins[msg.sender] = true;
         _mint(msg.sender, _initialSupply);
     }
 
@@ -49,28 +56,36 @@ contract YieldToken is IERC20, IYieldToken {
         symbol = _symbol;
     }
 
-    function addNonStakingAccount(address _account) external onlyGov {
+    function setYieldTrackers(address[] memory _yieldTrackers) external onlyGov {
+        yieldTrackers = _yieldTrackers;
+    }
+
+    function addAdmin(address _account) external onlyGov {
+        admins[_account] = true;
+    }
+
+    function removeAdmin(address _account) external onlyGov {
+        admins[_account] = false;
+    }
+
+    function addNonStakingAccount(address _account) external onlyAdmin {
         require(!nonStakingAccounts[_account], "YieldToken: _account already marked");
         nonStakingAccounts[_account] = true;
         nonStakingSupply = nonStakingSupply.add(balances[_account]);
     }
 
-    function removeNonStakingAccount(address _account) external onlyGov {
+    function removeNonStakingAccount(address _account) external onlyAdmin {
         require(nonStakingAccounts[_account], "YieldToken: _account not marked");
         nonStakingAccounts[_account] = false;
         nonStakingSupply = nonStakingSupply.sub(balances[_account]);
     }
 
     // to help users who accidentally send their tokens to this contract
-    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov {
+    function withdrawToken(address _token, address _account, uint256 _amount) external onlyAdmin {
         IERC20(_token).safeTransfer(_account, _amount);
     }
 
-    function setYieldTrackers(address[] memory _yieldTrackers) external onlyGov {
-        yieldTrackers = _yieldTrackers;
-    }
-
-    function recoverClaim(address _account, address _receiver) external onlyGov {
+    function recoverClaim(address _account, address _receiver) external onlyAdmin {
         for (uint256 i = 0; i < yieldTrackers.length; i++) {
             address yieldTracker = yieldTrackers[i];
             IYieldTracker(yieldTracker).claim(_account, _receiver);
