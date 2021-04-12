@@ -18,7 +18,6 @@ contract PriceFeed is IPriceFeed {
         gov = msg.sender;
     }
 
-
     function latestAnswer() public override view returns (int256) {
         return answer;
     }
