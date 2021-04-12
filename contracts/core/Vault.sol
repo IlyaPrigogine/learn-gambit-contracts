@@ -28,6 +28,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 constant BASIS_POINTS_DIVISOR = 10000;
     uint256 constant FUNDING_RATE_PRECISION = 1000000;
     uint256 constant PRICE_PRECISION = 10 ** 30;
+    uint256 constant ONE_USD = PRICE_PRECISION;
     uint256 constant MIN_LEVERAGE = 10000; // 1x
     uint256 constant USDG_DECIMALS = 18;
     uint256 constant MAX_FEE_BASIS_POINTS = 500; // 5%
@@ -63,6 +64,12 @@ contract Vault is ReentrancyGuard, IVault {
     mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public minProfitBasisPoints;
     mapping (address => bool) public stableTokens;
+    // Chainlink can return prices for stablecoins
+    // that are more than 0.04% (fee amount) higher than 1 USD
+    // we use strictStableTokens to cap the price to 1 USD
+    // this allows us to configure stablecoins like DAI as being a stableToken
+    // while not being a strictStableToken
+    mapping (address => bool) public strictStableTokens;
 
     // tokenBalances is used only to determine _transferIn values
     mapping (address => uint256) public tokenBalances;
@@ -146,6 +153,7 @@ contract Vault is ReentrancyGuard, IVault {
     event CollectSwapFees(address token, uint256 feeAmount);
     event CollectMarginFees(address token, uint256 feeUsd, uint256 feeTokens);
 
+    event DirectPoolDeposit(address token, uint256 amount);
     event IncreasePoolAmount(address token, uint256 amount);
     event DecreasePoolAmount(address token, uint256 amount);
     event IncreaseUsdgAmount(address token, uint256 amount);
@@ -231,7 +239,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _tokenDecimals,
         uint256 _redemptionBps,
         uint256 _minProfitBps,
-        bool _isStable
+        bool _isStable,
+        bool _isStrictStable
     ) external nonReentrant onlyGov {
         whitelistedTokens[_token] = true;
         priceFeeds[_token] = _priceFeed;
@@ -240,6 +249,7 @@ contract Vault is ReentrancyGuard, IVault {
         redemptionBasisPoints[_token] = _redemptionBps;
         minProfitBasisPoints[_token] = _minProfitBps;
         stableTokens[_token] = _isStable;
+        strictStableTokens[_token] = _isStrictStable;
 
         // validate price feed
         getMaxPrice(_token);
@@ -269,6 +279,15 @@ contract Vault is ReentrancyGuard, IVault {
 
     function removeRouter(address _router) external {
         approvedRouters[msg.sender][_router] = false;
+    }
+
+    // deposit into the pool without minting USDG tokens
+    // useful in allowing the pool to become over-collaterised
+    function directPoolDeposit(address _token) external nonReentrant {
+        uint256 tokenAmount = _transferIn(_token);
+        require(tokenAmount > 0, "Vault: invalid tokenAmount");
+        _increasePoolAmount(_token, tokenAmount);
+        emit DirectPoolDeposit(_token, tokenAmount);
     }
 
     function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
@@ -599,7 +618,16 @@ contract Vault is ReentrancyGuard, IVault {
 
         require(price > 0, "Vault: could not fetch price");
         // normalise price precision
-        return price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
+        price = price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
+
+        // Chainlink can return prices for stablecoins
+        // that are more than 0.04% (fee amount) higher than 1 USD
+        // we cap the price of stablecoins to 1 USD for added safety
+        if (strictStableTokens[_token] && price > ONE_USD) {
+            return ONE_USD;
+        }
+
+        return price;
     }
 
     function getPricePrecision(address _token) public view returns (uint256) {
@@ -609,11 +637,11 @@ contract Vault is ReentrancyGuard, IVault {
 
     function getRedemptionAmount(address _token, uint256 _usdgAmount) public override view returns (uint256) {
         uint256 price = getMaxPrice(_token);
-        // calculate the price based redemption amount
-        uint256 redemptionAmount = _usdgAmount.mul(PRICE_PRECISION).div(price);
+        uint256 priceBasedAmount = _usdgAmount.mul(PRICE_PRECISION).div(price);
+        priceBasedAmount = adjustForDecimals(priceBasedAmount, usdg, _token);
 
         if (stableTokens[_token]) {
-            return redemptionAmount;
+            return priceBasedAmount;
         }
 
         uint256 redemptionCollateral = getRedemptionCollateral(_token);
@@ -623,17 +651,17 @@ contract Vault is ReentrancyGuard, IVault {
 
         // if there is no USDG debt then the redemption amount based just on price can be supported
         if (totalUsdgAmount == 0) {
-            return redemptionAmount;
+            return priceBasedAmount;
         }
 
-        // calculate the cappedAmount based on the amount of backing collateral and the
+        // calculate the collateralBasedAmount based on the amount of backing collateral and the
         // total debt in USDG tokens for the asset
-        uint256 cappedAmount = _usdgAmount.mul(redemptionCollateral).div(totalUsdgAmount);
+        uint256 collateralBasedAmount = _usdgAmount.mul(redemptionCollateral).div(totalUsdgAmount);
         uint256 basisPoints = getRedemptionBasisPoints(_token);
-        cappedAmount = cappedAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
-        cappedAmount = adjustForDecimals(cappedAmount, usdg, _token);
+        collateralBasedAmount = collateralBasedAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
+        collateralBasedAmount = adjustForDecimals(collateralBasedAmount, usdg, _token);
 
-        return cappedAmount < redemptionAmount ? cappedAmount : redemptionAmount;
+        return collateralBasedAmount < priceBasedAmount ? collateralBasedAmount : priceBasedAmount;
     }
 
     function getRedemptionCollateral(address _token) public view returns (uint256) {
