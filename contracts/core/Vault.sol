@@ -451,12 +451,15 @@ contract Vault is ReentrancyGuard, IVault {
         _increaseReservedAmount(_collateralToken, reserveDelta);
 
         if (_isLong) {
-            // add the fee as it has been subtracted from the collateral
+            // guaranteedUsd stores the sum of (position.size - position.collateral) for all positions
+            // if a fee is charged on the collateral then guaranteedUsd should be increased by that fee amount
+            // since (position.size - position.collateral) would have increased by `fee`
             _increaseGuaranteedUsd(_collateralToken, _sizeDelta.add(fee));
             _decreaseGuaranteedUsd(_collateralToken, collateralDeltaUsd);
             // treat the deposited collateral as part of the pool
             _increasePoolAmount(_collateralToken, collateralDelta);
-            // fees need to be deducted from the pool since collateral is treated as part of the pool
+            // fees need to be deducted from the pool since fees are deducted from position.collateral
+            // and collateral is treated as part of the pool
             _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, fee));
         }
 
