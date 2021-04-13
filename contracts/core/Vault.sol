@@ -395,13 +395,12 @@ contract Vault is ReentrancyGuard, IVault {
         amountOut = adjustForDecimals(amountOut, _tokenIn, _tokenOut);
         uint256 amountAfterFees = _collectSwapFees(_tokenOut, amountOut, stableTokens[_tokenIn] && stableTokens[_tokenOut]);
 
-        // adjust usdgAmounts by the same usdAmount as debt is shifted between the assets
-        uint256 usdAmount = amountIn.mul(priceIn).div(PRICE_PRECISION);
-        uint256 usdIn = adjustForDecimals(usdAmount, _tokenIn, usdg);
-        uint256 usdOut = adjustForDecimals(usdAmount, _tokenOut, usdg);
+        // adjust usdgAmounts by the same usdgAmount as debt is shifted between the assets
+        uint256 usdgAmount = amountIn.mul(priceIn).div(PRICE_PRECISION);
+        usdgAmount = adjustForDecimals(usdgAmount, _tokenIn, usdg);
 
-        _increaseUsdgAmount(_tokenIn, usdIn);
-        _decreaseUsdgAmount(_tokenOut, usdOut);
+        _increaseUsdgAmount(_tokenIn, usdgAmount);
+        _decreaseUsdgAmount(_tokenOut, usdgAmount);
 
         _increasePoolAmount(_tokenIn, amountIn);
         _decreasePoolAmount(_tokenOut, amountOut);
