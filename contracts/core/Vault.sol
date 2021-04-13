@@ -393,7 +393,7 @@ contract Vault is ReentrancyGuard, IVault {
 
         uint256 amountOut = amountIn.mul(priceIn).div(priceOut);
         amountOut = adjustForDecimals(amountOut, _tokenIn, _tokenOut);
-        uint256 amountAfterFees = _collectSwapFees(_tokenOut, amountOut, stableTokens[_tokenIn] && stableTokens[_tokenOut]);
+        uint256 amountOutAfterFees = _collectSwapFees(_tokenOut, amountOut, stableTokens[_tokenIn] && stableTokens[_tokenOut]);
 
         // adjust usdgAmounts by the same usdgAmount as debt is shifted between the assets
         uint256 usdgAmount = amountIn.mul(priceIn).div(PRICE_PRECISION);
@@ -405,11 +405,11 @@ contract Vault is ReentrancyGuard, IVault {
         _increasePoolAmount(_tokenIn, amountIn);
         _decreasePoolAmount(_tokenOut, amountOut);
 
-        _transferOut(_tokenOut, amountAfterFees, _receiver);
+        _transferOut(_tokenOut, amountOutAfterFees, _receiver);
 
-        emit Swap(_tokenIn, _tokenOut, amountIn, amountAfterFees);
+        emit Swap(_tokenIn, _tokenOut, amountIn, amountOutAfterFees);
 
-        return amountAfterFees;
+        return amountOutAfterFees;
     }
 
     function increasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external override nonReentrant {
@@ -476,6 +476,7 @@ contract Vault is ReentrancyGuard, IVault {
         Position storage position = positions[key];
         require(position.size > 0, "Vault: empty position");
         require(position.size >= _sizeDelta, "Vault: position size exceeded");
+        require(position.collateral >= _collateralDelta, "Vault: position collateral exceeded");
 
         uint256 collateral = position.collateral;
         // scrop variables to avoid stack too deep errors
@@ -519,7 +520,7 @@ contract Vault is ReentrancyGuard, IVault {
                 _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, usdOut));
             }
             uint256 amountOutAfterFees = usdToTokenMin(_collateralToken, usdOutAfterFee);
-            _transferOut(_collateralToken, usdToTokenMin(_collateralToken, usdOutAfterFee), _receiver);
+            _transferOut(_collateralToken, amountOutAfterFees, _receiver);
             return amountOutAfterFees;
         }
 
@@ -549,12 +550,12 @@ contract Vault is ReentrancyGuard, IVault {
 
         emit LiquidatePosition(key, _account, _collateralToken, _indexToken, _isLong, position.size, position.collateral, position.reserveAmount, position.realisedPnl);
 
-        delete positions[key];
-
         if (!_isLong && marginFees < position.collateral) {
             uint256 remainingCollateral = position.collateral.sub(marginFees);
             _increasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, remainingCollateral));
         }
+
+        delete positions[key];
 
         // pay the fee receiver using the pool, we assume that in general the liquidated amount should be sufficient to cover
         // the liquidation fees
@@ -618,8 +619,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint80 roundId = priceFeed.latestRound();
 
         for (uint80 i = 0; i < priceSampleSpace; i++) {
-            if (roundId < i) { break; }
-            if (roundId - i == 0) { continue; }
+            if (roundId <= i) { break; }
             (, int256 p, , ,) = priceFeed.getRoundData(roundId - i);
             require(p > 0, "Vault: invalid price");
 
