@@ -135,7 +135,8 @@ contract Vault is ReentrancyGuard, IVault {
         bool isLong,
         uint256 size,
         uint256 collateral,
-        uint256 reserveAmount
+        uint256 reserveAmount,
+        int256 realisedPnl
     );
     event UpdatePosition(
         bytes32 key,
@@ -143,7 +144,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 collateral,
         uint256 averagePrice,
         uint256 entryFundingRate,
-        uint256 reserveAmount
+        uint256 reserveAmount,
+        int256 realisedPnl
     );
     event ClosePosition(
         bytes32 key,
@@ -151,7 +153,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 collateral,
         uint256 averagePrice,
         uint256 entryFundingRate,
-        uint256 reserveAmount
+        uint256 reserveAmount,
+        int256 realisedPnl
     );
 
     event UpdateFundingRate(address token, uint256 fundingRate);
@@ -183,7 +186,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _maxUsdgBuffer,
         uint256 _liquidationFeeUsd,
         uint256 _fundingRateFactor
-    ) external {
+    ) external nonReentrant {
         _onlyGov();
         require(!isInitialized, "Vault: already initialized");
         isInitialized = true;
@@ -196,7 +199,7 @@ contract Vault is ReentrancyGuard, IVault {
         fundingRateFactor = _fundingRateFactor;
     }
 
-    function setGov(address _gov) external {
+    function setGov(address _gov) external nonReentrant {
         _onlyGov();
         gov = _gov;
     }
@@ -235,15 +238,15 @@ contract Vault is ReentrancyGuard, IVault {
         require(_stableSwapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _stableSwapFeeBasisPoints");
         require(_marginFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _marginFeeBasisPoints");
         require(_liquidationFeeUsd <= MAX_LIQUIDATION_FEE_USD, "Vault: invalid _liquidationFeeUsd");
-        liquidationFeeUsd = _liquidationFeeUsd;
         swapFeeBasisPoints = _swapFeeBasisPoints;
         stableSwapFeeBasisPoints = _stableSwapFeeBasisPoints;
         marginFeeBasisPoints = _marginFeeBasisPoints;
+        liquidationFeeUsd = _liquidationFeeUsd;
     }
 
     function setFundingRate(uint256 _fundingInterval, uint256 _fundingRateFactor) external nonReentrant {
         _onlyGov();
-        require(_fundingInterval > MIN_FUNDING_RATE_INTERVAL, "Vault: invalid _fundingInterval");
+        require(_fundingInterval >= MIN_FUNDING_RATE_INTERVAL, "Vault: invalid _fundingInterval");
         require(_fundingRateFactor <= MAX_FUNDING_RATE_FACTOR, "Vault: invalid _fundingRateFactor");
         fundingInterval = _fundingInterval;
         fundingRateFactor = _fundingRateFactor;
@@ -287,6 +290,7 @@ contract Vault is ReentrancyGuard, IVault {
         delete redemptionBasisPoints[_token];
         delete minProfitBasisPoints[_token];
         delete stableTokens[_token];
+        delete strictStableTokens[_token];
         whitelistedTokenCount = whitelistedTokenCount.sub(1);
     }
 
@@ -298,11 +302,11 @@ contract Vault is ReentrancyGuard, IVault {
         _transferOut(_token, amount, _receiver);
     }
 
-    function addRouter(address _router) external {
+    function addRouter(address _router) external nonReentrant {
         approvedRouters[msg.sender][_router] = true;
     }
 
-    function removeRouter(address _router) external {
+    function removeRouter(address _router) external nonReentrant {
         approvedRouters[msg.sender][_router] = false;
     }
 
@@ -360,15 +364,15 @@ contract Vault is ReentrancyGuard, IVault {
 
         IUSDG(usdg).burn(address(this), usdgAmount);
 
-        uint256 tokenAmount = _collectSwapFees(_token, redemptionAmount, stableTokens[_token]);
-        require(tokenAmount > 0, "Vault: invalid tokenAmount");
-        _transferOut(_token, tokenAmount, _receiver);
-
         // the _transferIn call increased the value of tokenBalances[usdg]
         // usually decreases in token balances are synced by calling _transferOut
         // however, for usdg, the tokens are burnt, so _updateTokenBalance should
         // be manually called to record the decrease in tokens
         _updateTokenBalance(usdg);
+
+        uint256 tokenAmount = _collectSwapFees(_token, redemptionAmount, stableTokens[_token]);
+        require(tokenAmount > 0, "Vault: invalid tokenAmount");
+        _transferOut(_token, tokenAmount, _receiver);
 
         emit SellUSDG(_token, usdgAmount, tokenAmount);
 
@@ -458,7 +462,7 @@ contract Vault is ReentrancyGuard, IVault {
         }
 
         emit IncreasePosition(key, _account, _collateralToken, _indexToken, collateralDeltaUsd, _sizeDelta, _isLong);
-        emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
+        emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, position.realisedPnl);
     }
 
     function decreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external override nonReentrant returns (uint256) {
@@ -494,15 +498,17 @@ contract Vault is ReentrancyGuard, IVault {
             }
 
             emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
-            emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
+            emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, position.realisedPnl);
         } else {
             if (_isLong) {
                 _increaseGuaranteedUsd(_collateralToken, collateral);
                 _decreaseGuaranteedUsd(_collateralToken, _sizeDelta);
             }
-            delete positions[key];
+
             emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong);
-            emit ClosePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount);
+            emit ClosePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, position.realisedPnl);
+
+            delete positions[key];
         }
 
 
@@ -539,7 +545,7 @@ contract Vault is ReentrancyGuard, IVault {
             _decreaseGuaranteedUsd(_collateralToken, position.size.sub(position.collateral));
         }
 
-        emit LiquidatePosition(key, _account, _collateralToken, _indexToken, _isLong, position.size, position.collateral, position.reserveAmount);
+        emit LiquidatePosition(key, _account, _collateralToken, _indexToken, _isLong, position.size, position.collateral, position.reserveAmount, position.realisedPnl);
 
         delete positions[key];
 
@@ -667,12 +673,11 @@ contract Vault is ReentrancyGuard, IVault {
             return priceBasedAmount;
         }
 
-        // calculate the collateralBasedAmount based on the amount of backing collateral and the
+        // calculate the collateralBasedAmount from the amount of backing collateral and the
         // total debt in USDG tokens for the asset
         uint256 collateralBasedAmount = _usdgAmount.mul(redemptionCollateral).div(totalUsdgAmount);
         uint256 basisPoints = getRedemptionBasisPoints(_token);
         collateralBasedAmount = collateralBasedAmount.mul(basisPoints).div(BASIS_POINTS_DIVISOR);
-        collateralBasedAmount = adjustForDecimals(collateralBasedAmount, usdg, _token);
 
         return collateralBasedAmount < priceBasedAmount ? collateralBasedAmount : priceBasedAmount;
     }
