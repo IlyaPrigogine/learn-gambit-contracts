@@ -49,66 +49,66 @@ describe("Vault.buyUSDG", function () {
     await usdg.setYieldTrackers([yieldTracker0.address])
   })
 
-  // it("buyUSDG", async () => {
-  //   await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
-  //     .to.be.revertedWith("Vault: minting not enabled")
-  //
-  //   await expect(vault.buyUSDG(bnb.address, user1.address))
-  //     .to.be.revertedWith("Vault: _token not whitelisted")
-  //
-  //   await vault.enableMinting()
-  //
-  //   await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
-  //     .to.be.revertedWith("Vault: _token not whitelisted")
-  //
-  //   await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-  //   await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
-  //
-  //   await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
-  //     .to.be.revertedWith("Vault: invalid tokenAmount")
-  //
-  //   expect(await usdg.balanceOf(user0.address)).eq(0)
-  //   expect(await usdg.balanceOf(user1.address)).eq(0)
-  //   expect(await vault.feeReserves(bnb.address)).eq(0)
-  //   expect(await vault.usdgAmounts(bnb.address)).eq(0)
-  //   expect(await vault.poolAmounts(bnb.address)).eq(0)
-  //
-  //   await bnb.mint(user0.address, 100)
-  //   await bnb.connect(user0).transfer(vault.address, 100)
-  //   const tx = await vault.connect(user0).buyUSDG(bnb.address, user1.address)
-  //   await reportGasUsed(provider, tx, "buyUSDG gas used")
-  //
-  //   expect(await usdg.balanceOf(user0.address)).eq(0)
-  //   expect(await usdg.balanceOf(user1.address)).eq(29700)
-  //   expect(await vault.feeReserves(bnb.address)).eq(1)
-  //   expect(await vault.usdgAmounts(bnb.address)).eq(29700)
-  //   expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
-  // })
-  //
-  // it("buyUSDG allows gov to mint", async () => {
-  //   await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
-  //     .to.be.revertedWith("Vault: minting not enabled")
-  //
-  //   await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-  //   await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
-  //
-  //   await bnb.mint(wallet.address, 100)
-  //   await bnb.transfer(vault.address, 100)
-  //
-  //   expect(await usdg.balanceOf(wallet.address)).eq(0)
-  //   expect(await usdg.balanceOf(user1.address)).eq(0)
-  //   expect(await vault.feeReserves(bnb.address)).eq(0)
-  //   expect(await vault.usdgAmounts(bnb.address)).eq(0)
-  //   expect(await vault.poolAmounts(bnb.address)).eq(0)
-  //
-  //   await vault.buyUSDG(bnb.address, user1.address)
-  //
-  //   expect(await usdg.balanceOf(wallet.address)).eq(0)
-  //   expect(await usdg.balanceOf(user1.address)).eq(29700)
-  //   expect(await vault.feeReserves(bnb.address)).eq(1)
-  //   expect(await vault.usdgAmounts(bnb.address)).eq(29700)
-  //   expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
-  // })
+  it("buyUSDG", async () => {
+    await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: minting not enabled")
+
+    await expect(vault.buyUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: _token not whitelisted")
+
+    await vault.enableMinting()
+
+    await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: _token not whitelisted")
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
+
+    await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: invalid tokenAmount")
+
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
+
+    await bnb.mint(user0.address, 100)
+    await bnb.connect(user0).transfer(vault.address, 100)
+    const tx = await vault.connect(user0).buyUSDG(bnb.address, user1.address)
+    await reportGasUsed(provider, tx, "buyUSDG gas used")
+
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(29700)
+    expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+  })
+
+  it("buyUSDG allows gov to mint", async () => {
+    await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
+      .to.be.revertedWith("Vault: minting not enabled")
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
+
+    await bnb.mint(wallet.address, 100)
+    await bnb.transfer(vault.address, 100)
+
+    expect(await usdg.balanceOf(wallet.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
+
+    await vault.buyUSDG(bnb.address, user1.address)
+
+    expect(await usdg.balanceOf(wallet.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(29700)
+    expect(await vault.feeReserves(bnb.address)).eq(1)
+    expect(await vault.usdgAmounts(bnb.address)).eq(29700)
+    expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+  })
 
   it("buyUSDG caps mint amount", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
