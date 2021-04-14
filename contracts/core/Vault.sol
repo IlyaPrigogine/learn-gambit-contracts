@@ -38,6 +38,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 constant MAX_FUNDING_RATE_FACTOR = 10000; // 1%
 
     bool public isInitialized;
+    bool public isMintingEnabled = false;
 
     address public router;
     address public ammPriceFeed;
@@ -199,29 +200,34 @@ contract Vault is ReentrancyGuard, IVault {
         fundingRateFactor = _fundingRateFactor;
     }
 
-    function setGov(address _gov) external nonReentrant {
+    function enableMinting() external {
+        _onlyGov();
+        isMintingEnabled = true;
+    }
+
+    function setGov(address _gov) external {
         _onlyGov();
         gov = _gov;
     }
 
-    function setAmmPriceFeed(address _ammPriceFeed) external nonReentrant {
+    function setAmmPriceFeed(address _ammPriceFeed) external {
         _onlyGov();
         ammPriceFeed = _ammPriceFeed;
     }
 
-    function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external nonReentrant {
+    function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external {
         _onlyGov();
         maxUsdgBatchSize = _maxUsdgBatchSize;
         maxUsdgBuffer = _maxUsdgBuffer;
     }
 
-    function setMaxLeverage(uint256 _maxLeverage) external nonReentrant {
+    function setMaxLeverage(uint256 _maxLeverage) external {
         _onlyGov();
         require(_maxLeverage > MIN_LEVERAGE, "Vault: invalid _maxLeverage");
         maxLeverage = _maxLeverage;
     }
 
-    function setPriceSampleSpace(uint256 _priceSampleSpace) external nonReentrant {
+    function setPriceSampleSpace(uint256 _priceSampleSpace) external {
         _onlyGov();
         require(_priceSampleSpace > 0, "Vault: invalid _priceSampleSpace");
         priceSampleSpace = _priceSampleSpace;
@@ -232,7 +238,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _stableSwapFeeBasisPoints,
         uint256 _marginFeeBasisPoints,
         uint256 _liquidationFeeUsd
-    ) external nonReentrant {
+    ) external {
         _onlyGov();
         require(_swapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _swapFeeBasisPoints");
         require(_stableSwapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _stableSwapFeeBasisPoints");
@@ -244,7 +250,7 @@ contract Vault is ReentrancyGuard, IVault {
         liquidationFeeUsd = _liquidationFeeUsd;
     }
 
-    function setFundingRate(uint256 _fundingInterval, uint256 _fundingRateFactor) external nonReentrant {
+    function setFundingRate(uint256 _fundingInterval, uint256 _fundingRateFactor) external {
         _onlyGov();
         require(_fundingInterval >= MIN_FUNDING_RATE_INTERVAL, "Vault: invalid _fundingInterval");
         require(_fundingRateFactor <= MAX_FUNDING_RATE_FACTOR, "Vault: invalid _fundingRateFactor");
@@ -261,7 +267,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _minProfitBps,
         bool _isStable,
         bool _isStrictStable
-    ) external nonReentrant {
+    ) external {
         _onlyGov();
         // increment token count for the first time
         if (!whitelistedTokens[_token]) {
@@ -280,7 +286,7 @@ contract Vault is ReentrancyGuard, IVault {
         getMaxPrice(_token);
     }
 
-    function clearTokenConfig(address _token) external nonReentrant {
+    function clearTokenConfig(address _token) external {
         _onlyGov();
         require(whitelistedTokens[_token], "Vault: token not whitelisted");
         delete whitelistedTokens[_token];
@@ -320,6 +326,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
+        require(isMintingEnabled, "Vault: minting not enabled");
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
 
         uint256 tokenAmount = _transferIn(_token);
