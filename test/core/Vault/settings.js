@@ -198,8 +198,8 @@ describe("Vault.settings", function () {
       18, // _tokenDecimals
       9000, // _redemptionBps
       75, // _minProfitBps
-      false, // _isStable
-      true // _isStrictStable
+      true, // _isStable
+      false // _isStrictStable
     ]
 
     await expect(vault.connect(user0).setTokenConfig(...params))
@@ -229,8 +229,8 @@ describe("Vault.settings", function () {
     expect(await vault.tokenDecimals(bnb.address)).eq(18)
     expect(await vault.redemptionBasisPoints(bnb.address)).eq(9000)
     expect(await vault.minProfitBasisPoints(bnb.address)).eq(75)
-    expect(await vault.stableTokens(bnb.address)).eq(false)
-    expect(await vault.strictStableTokens(bnb.address)).eq(true)
+    expect(await vault.stableTokens(bnb.address)).eq(true)
+    expect(await vault.strictStableTokens(bnb.address)).eq(false)
 
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
 
@@ -241,8 +241,8 @@ describe("Vault.settings", function () {
       2,
       5000,
       50,
-      true,
-      false
+      false,
+      true
     )
 
     expect(await vault.whitelistedTokenCount()).eq(2)
@@ -252,8 +252,8 @@ describe("Vault.settings", function () {
     expect(await vault.tokenDecimals(dai.address)).eq(2)
     expect(await vault.redemptionBasisPoints(dai.address)).eq(5000)
     expect(await vault.minProfitBasisPoints(dai.address)).eq(50)
-    expect(await vault.stableTokens(dai.address)).eq(true)
-    expect(await vault.strictStableTokens(dai.address)).eq(false)
+    expect(await vault.stableTokens(dai.address)).eq(false)
+    expect(await vault.strictStableTokens(dai.address)).eq(true)
 
     await vault.setTokenConfig(
       dai.address,
@@ -330,5 +330,19 @@ describe("Vault.settings", function () {
 
     await expect(vault.clearTokenConfig(bnb.address))
       .to.be.revertedWith("Vault: token not whitelisted")
+  })
+
+  it("addRouter", async () => {
+    expect(await vault.approvedRouters(user0.address, user1.address)).eq(false)
+    await vault.connect(user0).addRouter(user1.address)
+    expect(await vault.approvedRouters(user0.address, user1.address)).eq(true)
+  })
+
+  it("removeRouter", async () => {
+    expect(await vault.approvedRouters(user0.address, user1.address)).eq(false)
+    await vault.connect(user0).addRouter(user1.address)
+    expect(await vault.approvedRouters(user0.address, user1.address)).eq(true)
+    await vault.connect(user0).removeRouter(user1.address)
+    expect(await vault.approvedRouters(user0.address, user1.address)).eq(false)
   })
 })
