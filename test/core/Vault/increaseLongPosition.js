@@ -4,6 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -36,7 +37,7 @@ describe("Vault.increaseLongPosition", function () {
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -50,15 +51,7 @@ describe("Vault.increaseLongPosition", function () {
 
   it("increasePosition long validations", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
     await expect(vault.connect(user1).increasePosition(user0.address, btc.address, btc.address, 0, true))
       .to.be.revertedWith("Vault: invalid msg.sender")
     await expect(vault.connect(user0).increasePosition(user0.address, btc.address, bnb.address, toUsd(1000), true))
@@ -69,15 +62,7 @@ describe("Vault.increaseLongPosition", function () {
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
@@ -124,15 +109,7 @@ describe("Vault.increaseLongPosition", function () {
 
   it("increasePosition long", async () => {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))

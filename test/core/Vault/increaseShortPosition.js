@@ -4,6 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -36,7 +37,7 @@ describe("Vault.increaseShortPosition", function () {
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -50,15 +51,7 @@ describe("Vault.increaseShortPosition", function () {
 
   it("increasePosition short validations", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.setTokenConfig(
-      bnb.address, // _token
-      bnbPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
     await expect(vault.connect(user1).increasePosition(user0.address, dai.address, btc.address, 0, false))
       .to.be.revertedWith("Vault: invalid msg.sender")
     await expect(vault.connect(user0).increasePosition(user0.address, dai.address, btc.address, toUsd(1000), false))
@@ -66,15 +59,8 @@ describe("Vault.increaseShortPosition", function () {
     await expect(vault.connect(user0).increasePosition(user0.address, bnb.address, bnb.address, toUsd(1000), false))
       .to.be.revertedWith("Vault: _collateralToken must be a stableToken")
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
+
     await expect(vault.connect(user0).increasePosition(user0.address, dai.address, dai.address, toUsd(1000), false))
       .to.be.revertedWith("Vault: _indexToken must not be a stableToken")
 
@@ -82,15 +68,7 @@ describe("Vault.increaseShortPosition", function () {
       .to.be.revertedWith("Vault: invalid price feed")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
@@ -136,25 +114,10 @@ describe("Vault.increaseShortPosition", function () {
 
   it("increasePosition short", async () => {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
+
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
@@ -175,11 +138,11 @@ describe("Vault.increaseShortPosition", function () {
 
     expect(await vault.getRedemptionCollateralUsd(dai.address)).eq(0)
     await vault.buyUSDG(dai.address, user1.address)
-    expect(await vault.getRedemptionCollateralUsd(dai.address)).eq(toUsd(99.7))
+    expect(await vault.getRedemptionCollateralUsd(dai.address)).eq("99960000000000000000000000000000")
 
-    expect(await vault.feeReserves(dai.address)).eq("300000000000000000") // 0.30
-    expect(await vault.usdgAmounts(dai.address)).eq("99700000000000000000") // 99.7
-    expect(await vault.poolAmounts(dai.address)).eq("99700000000000000000") // 99.7
+    expect(await vault.feeReserves(dai.address)).eq("40000000000000000") // 0.04
+    expect(await vault.usdgAmounts(dai.address)).eq("99960000000000000000") // 99.7
+    expect(await vault.poolAmounts(dai.address)).eq("99960000000000000000") // 99.7
 
     await dai.connect(user0).transfer(vault.address, expandDecimals(10, 18))
     await expect(vault.connect(user0).increasePosition(user0.address, dai.address, btc.address, toUsd(100), false))
@@ -198,10 +161,10 @@ describe("Vault.increaseShortPosition", function () {
     const tx = await vault.connect(user0).increasePosition(user0.address, dai.address, btc.address, toUsd(90), false)
     await reportGasUsed(provider, tx, "increasePosition gas used")
 
-    expect(await vault.poolAmounts(dai.address)).eq("99700000000000000000")
+    expect(await vault.poolAmounts(dai.address)).eq("99960000000000000000")
     expect(await vault.reservedAmounts(dai.address)).eq(expandDecimals(90, 18))
     expect(await vault.guaranteedUsd(dai.address)).eq(0)
-    expect(await vault.getRedemptionCollateralUsd(dai.address)).eq(toUsd(99.7))
+    expect(await vault.getRedemptionCollateralUsd(dai.address)).eq("99960000000000000000000000000000")
 
     position = await vault.getPosition(user0.address, dai.address, btc.address, false)
     expect(position[0]).eq(toUsd(90)) // size
@@ -210,8 +173,8 @@ describe("Vault.increaseShortPosition", function () {
     expect(position[3]).eq(0) // entryFundingRate
     expect(position[4]).eq(expandDecimals(90, 18)) // reserveAmount
 
-    expect(await vault.feeReserves(dai.address)).eq("390000000000000000") // 0.39
-    expect(await vault.usdgAmounts(dai.address)).eq("99700000000000000000") // 99.7
-    expect(await vault.poolAmounts(dai.address)).eq("99700000000000000000") // 99.7
+    expect(await vault.feeReserves(dai.address)).eq("130000000000000000") // 0.13
+    expect(await vault.usdgAmounts(dai.address)).eq("99960000000000000000") // 99.7
+    expect(await vault.poolAmounts(dai.address)).eq("99960000000000000000") // 99.7
   })
 })

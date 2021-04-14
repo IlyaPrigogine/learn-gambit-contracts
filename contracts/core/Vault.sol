@@ -62,6 +62,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public override fundingRateFactor;
 
     bool public includeAmmPrice = true;
+    bool public useStrictStablePrice = true;
 
     mapping (address => mapping (address => bool)) public approvedRouters;
 
@@ -208,6 +209,11 @@ contract Vault is ReentrancyGuard, IVault {
     function setGov(address _gov) external {
         _onlyGov();
         gov = _gov;
+    }
+
+    function setUseStrictStablePrices(bool _useStrictStablePrice) external {
+        _onlyGov();
+        useStrictStablePrice = _useStrictStablePrice;
     }
 
     function setAmmPriceFeed(address _ammPriceFeed) external {
@@ -624,7 +630,7 @@ contract Vault is ReentrancyGuard, IVault {
         // Chainlink can return prices for stablecoins
         // that are more than 0.04% (fee amount) higher or lower than 1 USD
         // strictStableTokens can be used to keep the price of the stablecoin at 1 USD
-        if (strictStableTokens[_token]) {
+        if (useStrictStablePrice && strictStableTokens[_token]) {
             return ONE_USD;
         }
 

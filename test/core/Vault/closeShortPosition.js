@@ -4,6 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -36,7 +37,7 @@ describe("Vault.closeShortPosition", function () {
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -50,38 +51,14 @@ describe("Vault.closeShortPosition", function () {
 
   it("close short position", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.setTokenConfig(
-      bnb.address, // _token
-      bnbPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
     await expect(vault.connect(user0).decreasePosition(user0.address, dai.address, dai.address, 0, toUsd(1000), false, user2.address))
       .to.be.revertedWith("Vault: _indexToken must not be a stableToken")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await dai.mint(user0.address, expandDecimals(1000, 18))
     await dai.connect(user0).transfer(vault.address, expandDecimals(100, 18))

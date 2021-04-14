@@ -4,6 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -36,7 +37,7 @@ describe("Vault.decreaseLongPosition", function () {
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -50,15 +51,8 @@ describe("Vault.decreaseLongPosition", function () {
 
   it("decreasePosition long", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
+
     await expect(vault.connect(user1).decreasePosition(user0.address, btc.address, btc.address, 0, 0, true, user2.address))
       .to.be.revertedWith("Vault: invalid msg.sender")
     await expect(vault.connect(user0).decreasePosition(user0.address, btc.address, bnb.address, 0, toUsd(1000), true, user2.address))
@@ -69,15 +63,7 @@ describe("Vault.decreaseLongPosition", function () {
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
@@ -150,7 +136,7 @@ describe("Vault.decreaseLongPosition", function () {
       .to.be.revertedWith("Vault: position size exceeded")
 
     await expect(vault.connect(user0).decreasePosition(user0.address, btc.address, btc.address, toUsd(10), toUsd(50), true, user2.address))
-      .to.be.revertedWith("SafeMath: subtraction overflow")
+      .to.be.revertedWith("Vault: position collateral exceeded")
 
     await expect(vault.connect(user0).decreasePosition(user0.address, btc.address, btc.address, toUsd(8.91), toUsd(50), true, user2.address))
       .to.be.revertedWith("Vault: liquidation fees exceed collateral")
@@ -185,26 +171,10 @@ describe("Vault.decreaseLongPosition", function () {
 
   it("decreasePosition long with loss", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))

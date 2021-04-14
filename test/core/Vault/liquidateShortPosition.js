@@ -4,6 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -36,7 +37,7 @@ describe("Vault.liquidateShortPosition", function () {
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -50,43 +51,21 @@ describe("Vault.liquidateShortPosition", function () {
 
   it("liquidate short", async () => {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.setTokenConfig(
-      bnb.address, // _token
-      bnbPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
+
     await expect(vault.connect(user0).liquidatePosition(user0.address, dai.address, bnb.address, false, user2.address))
       .to.be.revertedWith("Vault: _collateralToken not whitelisted")
     await expect(vault.connect(user0).liquidatePosition(user0.address, bnb.address, dai.address, false, user2.address))
       .to.be.revertedWith("Vault: _collateralToken must be a stableToken")
 
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
+
     await expect(vault.connect(user0).liquidatePosition(user0.address, dai.address, dai.address, false, user2.address))
       .to.be.revertedWith("Vault: _indexToken must not be a stableToken")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(41000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
@@ -141,10 +120,10 @@ describe("Vault.liquidateShortPosition", function () {
     expect(position[3]).eq(0) // entryFundingRate
     expect(position[4]).eq(expandDecimals(90, 18)) // reserveAmount
 
-    expect(await vault.feeReserves(dai.address)).eq("390000000000000000") // 0.39
+    expect(await vault.feeReserves(dai.address)).eq("130000000000000000") // 0.13
     expect(await vault.reservedAmounts(dai.address)).eq(expandDecimals(90, 18))
     expect(await vault.guaranteedUsd(dai.address)).eq(0)
-    expect(await vault.poolAmounts(dai.address)).eq("99700000000000000000")
+    expect(await vault.poolAmounts(dai.address)).eq("99960000000000000000")
     expect(await dai.balanceOf(user2.address)).eq(0)
 
     const tx = await vault.liquidatePosition(user0.address, dai.address, btc.address, false, user2.address)
@@ -157,10 +136,10 @@ describe("Vault.liquidateShortPosition", function () {
     expect(position[3]).eq(0) // entryFundingRate
     expect(position[4]).eq(0) // reserveAmount
 
-    expect(await vault.feeReserves(dai.address)).eq("480000000000000000") // 0.48
+    expect(await vault.feeReserves(dai.address)).eq("220000000000000000") // 0.22
     expect(await vault.reservedAmounts(dai.address)).eq(0)
     expect(await vault.guaranteedUsd(dai.address)).eq(0)
-    expect(await vault.poolAmounts(dai.address)).eq("104520000000000000000") // 104.52
+    expect(await vault.poolAmounts(dai.address)).eq("104780000000000000000") // 104.78
     expect(await dai.balanceOf(user2.address)).eq(expandDecimals(5, 18))
   })
 })

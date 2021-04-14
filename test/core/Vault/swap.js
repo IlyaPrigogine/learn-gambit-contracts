@@ -4,6 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -36,7 +37,7 @@ describe("Vault.swap", function () {
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -46,6 +47,8 @@ describe("Vault.swap", function () {
 
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
+
+    await vault.enableMinting()
   })
 
   it("swap", async () => {
@@ -53,29 +56,13 @@ describe("Vault.swap", function () {
       .to.be.revertedWith("Vault: _tokenIn not whitelisted")
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
-    await vault.setTokenConfig(
-      bnb.address, // _token
-      bnbPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
 
     await expect(vault.connect(user1).swap(bnb.address, btc.address, user2.address))
       .to.be.revertedWith("Vault: _tokenOut not whitelisted")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await bnb.mint(user0.address, expandDecimals(200, 18))
     await btc.mint(user0.address, expandDecimals(1, 8))
@@ -121,7 +108,7 @@ describe("Vault.swap", function () {
 
     expect(await vault.feeReserves(btc.address)).eq("540000") // 1 * 0.3% => 0.003, 0.8 * 0.3% => 0.0024
     expect(await vault.usdgAmounts(btc.address)).eq(0)
-    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub("300000").sub(expandDecimals(8, 7)))
+    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub("300000").sub(expandDecimals(8, 7))) // 19700000, 0.197 BTC, 0.197 * 100,000 => 19700
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(400))
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(500))
@@ -129,12 +116,12 @@ describe("Vault.swap", function () {
 
     expect(await bnb.balanceOf(user0.address)).eq(0)
     expect(await bnb.balanceOf(user3.address)).eq(0)
-    await usdg.connect(user0).transfer(vault.address, expandDecimals(100000, 18))
+    await usdg.connect(user0).transfer(vault.address, expandDecimals(90000, 18))
     await vault.sellUSDG(bnb.address, user3.address)
     expect(await bnb.balanceOf(user0.address)).eq(0)
-    expect(await bnb.balanceOf(user3.address)).eq(expandDecimals(200, 18).sub(expandDecimals(6, 17)))
+    expect(await bnb.balanceOf(user3.address)).eq("179460000000000000000") // 179.46, 90000 / 500 * 99.7%
 
-    await usdg.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
+    await usdg.connect(user0).transfer(vault.address, expandDecimals(20000, 18))
 
     await expect(vault.sellUSDG(btc.address, user3.address))
       .to.be.revertedWith("Vault: poolAmount exceeded")
