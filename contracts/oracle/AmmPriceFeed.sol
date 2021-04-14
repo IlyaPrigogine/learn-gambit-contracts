@@ -63,6 +63,10 @@ contract AmmPriceFeed is IAmmPriceFeed {
         uint256 balance0 = IERC20(_token0).balanceOf(pair);
         uint256 balance1 = IERC20(_token1).balanceOf(pair);
 
+        if (balance0 == 0 || balance1 == 0) {
+            return 0;
+        }
+
         uint256 decimals0 = IVault(vault).tokenDecimals(_token0);
         uint256 decimals1 = IVault(vault).tokenDecimals(_token1);
 
