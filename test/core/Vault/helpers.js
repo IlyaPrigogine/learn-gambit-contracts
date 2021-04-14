@@ -12,4 +12,17 @@ async function initVault(vault, router, usdg) {
     )
 }
 
-module.exports = { initVault }
+function getBnbConfig(bnb, bnbPriceFeed) {
+  return [
+    bnb.address, // _token
+    bnbPriceFeed.address, // _priceFeed
+    8, // _priceDecimals
+    18, // _tokenDecimals
+    9000, // _redemptionBps
+    75, // _minProfitBps
+    false, // _isStable
+    false // _isStrictStable
+  ]
+}
+
+module.exports = { initVault, getBnbConfig }

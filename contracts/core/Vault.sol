@@ -318,7 +318,8 @@ contract Vault is ReentrancyGuard, IVault {
 
     // deposit into the pool without minting USDG tokens
     // useful in allowing the pool to become over-collaterised
-    function directPoolDeposit(address _token) external nonReentrant {
+    function directPoolDeposit(address _token) external override nonReentrant {
+        require(whitelistedTokens[_token], "Vault: _token not whitelisted");
         uint256 tokenAmount = _transferIn(_token);
         require(tokenAmount > 0, "Vault: invalid tokenAmount");
         _increasePoolAmount(_token, tokenAmount);

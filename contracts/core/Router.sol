@@ -28,6 +28,11 @@ contract Router {
 
     receive() external payable {}
 
+    function directPoolDeposit(address _token, uint256 _amount) public {
+        IERC20(_token).safeTransferFrom(_sender(), vault, _amount);
+        IVault(vault).directPoolDeposit(_token);
+    }
+
     function swap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) public {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         _swap(_path, _minOut, _receiver);
