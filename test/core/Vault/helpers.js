@@ -38,4 +38,17 @@ function getBtcConfig(btc, btcPriceFeed) {
   ]
 }
 
-module.exports = { initVault, getBnbConfig, getBtcConfig }
+function getDaiConfig(dai, daiPriceFeed) {
+  return [
+    dai.address, // _token
+    daiPriceFeed.address, // _priceFeed
+    8, // _priceDecimals
+    18, // _tokenDecimals
+    9000, // _redemptionBps
+    75, // _minProfitBps
+    true, // _isStable
+    false // _isStrictStable
+  ]
+}
+
+module.exports = { initVault, getBnbConfig, getBtcConfig, getDaiConfig }

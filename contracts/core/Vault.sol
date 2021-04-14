@@ -621,6 +621,13 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function getPrice(address _token, bool _maximise) public view returns (uint256) {
+        // Chainlink can return prices for stablecoins
+        // that are more than 0.04% (fee amount) higher or lower than 1 USD
+        // strictStableTokens can be used to keep the price of the stablecoin at 1 USD
+        if (strictStableTokens[_token]) {
+            return ONE_USD;
+        }
+
         address priceFeedAddress = priceFeeds[_token];
         require(priceFeedAddress != address(0), "Vault: invalid price feed");
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
@@ -654,13 +661,6 @@ contract Vault is ReentrancyGuard, IVault {
         require(price > 0, "Vault: could not fetch price");
         // normalise price precision
         price = price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
-
-        // Chainlink can return prices for stablecoins
-        // that are more than 0.04% (fee amount) higher than 1 USD
-        // we cap the price of stablecoins to 1 USD for added safety
-        if (strictStableTokens[_token] && price > ONE_USD) {
-            return ONE_USD;
-        }
 
         return price;
     }

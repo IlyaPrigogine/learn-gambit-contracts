@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -221,6 +221,26 @@ describe("Vault.buyUSDG", function () {
     expect(await vault.feeReserves(bnb.address)).eq(30)
     expect(await vault.usdgAmounts(bnb.address)).eq(9970 * 300)
     expect(await vault.poolAmounts(bnb.address)).eq(10000 - 30)
+  })
+
+  it("buyUSDG uses stableSwapFeeBasisPoints", async () => {
+    await vault.enableMinting()
+    await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
+
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(0)
+    expect(await vault.feeReserves(bnb.address)).eq(0)
+    expect(await vault.usdgAmounts(bnb.address)).eq(0)
+    expect(await vault.poolAmounts(bnb.address)).eq(0)
+    await dai.mint(user0.address, expandDecimals(10000, 18))
+    await dai.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
+    await vault.connect(user0).buyUSDG(dai.address, user1.address)
+    expect(await usdg.balanceOf(user0.address)).eq(0)
+    expect(await usdg.balanceOf(user1.address)).eq(expandDecimals(10000 - 4, 18))
+    expect(await vault.feeReserves(dai.address)).eq(expandDecimals(4, 18))
+    expect(await vault.usdgAmounts(dai.address)).eq(expandDecimals(10000 - 4, 18))
+    expect(await vault.poolAmounts(dai.address)).eq(expandDecimals(10000 - 4, 18))
   })
 
   it("buyUSDG adjusts for decimals", async () => {
