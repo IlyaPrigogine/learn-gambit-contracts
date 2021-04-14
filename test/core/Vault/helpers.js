@@ -25,4 +25,17 @@ function getBnbConfig(bnb, bnbPriceFeed) {
   ]
 }
 
-module.exports = { initVault, getBnbConfig }
+function getBtcConfig(btc, btcPriceFeed) {
+  return [
+    btc.address, // _token
+    btcPriceFeed.address, // _priceFeed
+    8, // _priceDecimals
+    8, // _tokenDecimals
+    9000, // _redemptionBps
+    75, // _minProfitBps
+    false, // _isStable
+    false // _isStrictStable
+  ]
+}
+
+module.exports = { initVault, getBnbConfig, getBtcConfig }

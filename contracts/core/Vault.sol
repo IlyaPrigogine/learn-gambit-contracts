@@ -327,7 +327,9 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
-        require(isMintingEnabled, "Vault: minting not enabled");
+        if (msg.sender != gov) {
+            require(isMintingEnabled, "Vault: minting not enabled");
+        }
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
 
         uint256 tokenAmount = _transferIn(_token);
