@@ -61,7 +61,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public fundingInterval = 8 hours;
     uint256 public override fundingRateFactor;
 
-    bool public excludeAmmPrice;
+    bool public includeAmmPrice = true;
 
     mapping (address => mapping (address => bool)) public approvedRouters;
 
@@ -535,8 +535,8 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function liquidatePosition(address _account, address _collateralToken, address _indexToken, bool _isLong, address _feeReceiver) external nonReentrant {
-        // excludeAmmPrice to prevent manipulated liquidations
-        excludeAmmPrice = true;
+        // set includeAmmPrice to false prevent manipulated liquidations
+        includeAmmPrice = false;
 
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -569,7 +569,7 @@ contract Vault is ReentrancyGuard, IVault {
         _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, liquidationFeeUsd));
         _transferOut(_collateralToken, usdToTokenMin(_collateralToken, liquidationFeeUsd), _feeReceiver);
 
-        excludeAmmPrice = false;
+        includeAmmPrice = true;
     }
 
     function validateLiquidation(address _account, address _collateralToken, address _indexToken, bool _isLong, bool _raise) public view returns (bool, uint256) {
@@ -622,7 +622,11 @@ contract Vault is ReentrancyGuard, IVault {
         require(priceFeedAddress != address(0), "Vault: invalid price feed");
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
 
-        uint256 price = excludeAmmPrice ? 0 : IAmmPriceFeed(ammPriceFeed).getPrice(_token);
+        uint256 price = 0;
+        if (includeAmmPrice && ammPriceFeed != address(0)) {
+            price = IAmmPriceFeed(ammPriceFeed).getPrice(_token);
+        }
+
         uint80 roundId = priceFeed.latestRound();
 
         for (uint80 i = 0; i < priceSampleSpace; i++) {
