@@ -52,7 +52,7 @@ contract Reader {
     }
 
     function getVaultTokenInfo(address _vault, address _weth, uint256 _usdgAmount, address[] memory _tokens) public view returns (uint256[] memory) {
-        uint256 propsLength = 6;
+        uint256 propsLength = 7;
         IVault vault = IVault(_vault);
         uint256[] memory amounts = new uint256[](_tokens.length * propsLength);
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -66,6 +66,7 @@ contract Reader {
             amounts[i * propsLength + 3] = vault.getRedemptionAmount(token, _usdgAmount);
             amounts[i * propsLength + 4] = vault.getMinPrice(token);
             amounts[i * propsLength + 5] = vault.getMaxPrice(token);
+            amounts[i * propsLength + 6] = vault.guaranteedUsd(token);
         }
 
         return amounts;

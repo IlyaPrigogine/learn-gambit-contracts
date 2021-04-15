@@ -98,7 +98,7 @@ contract Vault is ReentrancyGuard, IVault {
     // this is an estimated amount, it is possible for the actual guaranteed value to be lower
     // in the case of sudden price decreases, the guaranteed value should be corrected
     // after liquidations are carried out
-    mapping (address => uint256) public guaranteedUsd;
+    mapping (address => uint256) public override guaranteedUsd;
 
     mapping (address => uint256) public override cumulativeFundingRates;
     mapping (address => uint256) public lastFundingTimes;
