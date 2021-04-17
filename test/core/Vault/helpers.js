@@ -22,7 +22,8 @@ function getBnbConfig(bnb, bnbPriceFeed) {
     9000, // _redemptionBps
     75, // _minProfitBps
     false, // _isStable
-    false // _isStrictStable
+    false, // _isStrictStable
+    true // _isShortable
   ]
 }
 
@@ -35,7 +36,8 @@ function getBtcConfig(btc, btcPriceFeed) {
     9000, // _redemptionBps
     75, // _minProfitBps
     false, // _isStable
-    false // _isStrictStable
+    false, // _isStrictStable
+    true // _isShortable
   ]
 }
 
@@ -48,7 +50,8 @@ function getDaiConfig(dai, daiPriceFeed) {
     9000, // _redemptionBps
     75, // _minProfitBps
     true, // _isStable
-    false // _isStrictStable
+    false, // _isStrictStable
+    false // _isShortable
   ]
 }
 

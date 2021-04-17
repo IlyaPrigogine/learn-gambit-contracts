@@ -221,7 +221,8 @@ describe("Vault.settings", function () {
       9000, // _redemptionBps
       75, // _minProfitBps
       true, // _isStable
-      false // _isStrictStable
+      false, // _isStrictStable
+      true // _isShortable
     ]
 
     await expect(vault.connect(user0).setTokenConfig(...params))
@@ -241,6 +242,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(bnb.address)).eq(0)
     expect(await vault.stableTokens(bnb.address)).eq(false)
     expect(await vault.strictStableTokens(bnb.address)).eq(false)
+    expect(await vault.shortableTokens(bnb.address)).eq(false)
 
     await vault.setTokenConfig(...params)
 
@@ -253,6 +255,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(bnb.address)).eq(75)
     expect(await vault.stableTokens(bnb.address)).eq(true)
     expect(await vault.strictStableTokens(bnb.address)).eq(false)
+    expect(await vault.shortableTokens(bnb.address)).eq(true)
 
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
 
@@ -264,7 +267,8 @@ describe("Vault.settings", function () {
       5000,
       50,
       false,
-      true
+      true,
+      false
     )
 
     expect(await vault.whitelistedTokenCount()).eq(2)
@@ -276,6 +280,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(dai.address)).eq(50)
     expect(await vault.stableTokens(dai.address)).eq(false)
     expect(await vault.strictStableTokens(dai.address)).eq(true)
+    expect(await vault.shortableTokens(dai.address)).eq(false)
 
     await vault.setTokenConfig(
       dai.address,
@@ -285,7 +290,8 @@ describe("Vault.settings", function () {
       11000,
       10,
       true,
-      true
+      true,
+      false
     )
 
     expect(await vault.whitelistedTokenCount()).eq(2)
@@ -297,6 +303,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(dai.address)).eq(10)
     expect(await vault.stableTokens(dai.address)).eq(true)
     expect(await vault.strictStableTokens(dai.address)).eq(true)
+    expect(await vault.shortableTokens(dai.address)).eq(false)
   })
 
   it("clearTokenConfig", async () => {
@@ -308,7 +315,8 @@ describe("Vault.settings", function () {
       9000, // _redemptionBps
       75, // _minProfitBps
       true, // _isStable
-      true // _isStrictStable
+      true, // _isStrictStable
+      true // _isShortable
     ]
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
@@ -322,6 +330,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(bnb.address)).eq(0)
     expect(await vault.stableTokens(bnb.address)).eq(false)
     expect(await vault.strictStableTokens(bnb.address)).eq(false)
+    expect(await vault.shortableTokens(bnb.address)).eq(false)
 
     await vault.setTokenConfig(...params)
 
@@ -334,6 +343,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(bnb.address)).eq(75)
     expect(await vault.stableTokens(bnb.address)).eq(true)
     expect(await vault.strictStableTokens(bnb.address)).eq(true)
+    expect(await vault.shortableTokens(bnb.address)).eq(true)
 
     await expect(vault.connect(user0).clearTokenConfig(bnb.address))
       .to.be.revertedWith("Vault: forbidden")
@@ -349,6 +359,7 @@ describe("Vault.settings", function () {
     expect(await vault.minProfitBasisPoints(bnb.address)).eq(0)
     expect(await vault.stableTokens(bnb.address)).eq(false)
     expect(await vault.strictStableTokens(bnb.address)).eq(false)
+    expect(await vault.shortableTokens(bnb.address)).eq(false)
 
     await expect(vault.clearTokenConfig(bnb.address))
       .to.be.revertedWith("Vault: token not whitelisted")

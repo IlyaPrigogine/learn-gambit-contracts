@@ -3,6 +3,12 @@
 pragma solidity 0.6.12;
 
 interface IVault {
+    function setMaxStrictPriceDeviation(uint256 _maxStrictPriceDeviation) external;
+    function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external;
+    function setPriceSampleSpace(uint256 _priceSampleSpace) external;
+    function setMaxGasPrice(uint256 _maxGasPrice) external;
+    function withdrawFees(address _token, address _receiver) external returns (uint256);
+
     function directPoolDeposit(address _token) external;
     function buyUSDG(address _token, address _receiver) external returns (uint256);
     function sellUSDG(address _token, address _receiver) external returns (uint256);

@@ -81,6 +81,8 @@ contract Vault is ReentrancyGuard, IVault {
     // while not being a strictStableToken
     mapping (address => bool) public strictStableTokens;
 
+    mapping (address => bool) public shortableTokens;
+
     // tokenBalances is used only to determine _transferIn values
     mapping (address => uint256) public tokenBalances;
 
@@ -190,7 +192,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _liquidationFeeUsd,
         uint256 _fundingRateFactor,
         uint256 _maxGasPrice
-    ) external nonReentrant {
+    ) external {
         _onlyGov();
         require(!isInitialized, "Vault: already initialized");
         isInitialized = true;
@@ -214,7 +216,7 @@ contract Vault is ReentrancyGuard, IVault {
         gov = _gov;
     }
 
-    function setMaxStrictPriceDeviation(uint256 _maxStrictPriceDeviation) external {
+    function setMaxStrictPriceDeviation(uint256 _maxStrictPriceDeviation) external override {
         _onlyGov();
         maxStrictPriceDeviation = _maxStrictPriceDeviation;
     }
@@ -224,7 +226,7 @@ contract Vault is ReentrancyGuard, IVault {
         ammPriceFeed = _ammPriceFeed;
     }
 
-    function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external {
+    function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external override {
         _onlyGov();
         maxUsdgBatchSize = _maxUsdgBatchSize;
         maxUsdgBuffer = _maxUsdgBuffer;
@@ -236,13 +238,13 @@ contract Vault is ReentrancyGuard, IVault {
         maxLeverage = _maxLeverage;
     }
 
-    function setPriceSampleSpace(uint256 _priceSampleSpace) external {
+    function setPriceSampleSpace(uint256 _priceSampleSpace) external override {
         _onlyGov();
         require(_priceSampleSpace > 0, "Vault: invalid _priceSampleSpace");
         priceSampleSpace = _priceSampleSpace;
     }
 
-    function setMaxGasPrice(uint256 _maxGasPrice) external {
+    function setMaxGasPrice(uint256 _maxGasPrice) external override {
         _onlyGov();
         require(_maxGasPrice > 0, "Vault: invalid _maxGasPrice");
         maxGasPrice = _maxGasPrice;
@@ -281,7 +283,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _redemptionBps,
         uint256 _minProfitBps,
         bool _isStable,
-        bool _isStrictStable
+        bool _isStrictStable,
+        bool _isShortable
     ) external {
         _onlyGov();
         // increment token count for the first time
@@ -296,6 +299,7 @@ contract Vault is ReentrancyGuard, IVault {
         minProfitBasisPoints[_token] = _minProfitBps;
         stableTokens[_token] = _isStable;
         strictStableTokens[_token] = _isStrictStable;
+        shortableTokens[_token] = _isShortable;
 
         // validate price feed
         getMaxPrice(_token);
@@ -312,10 +316,11 @@ contract Vault is ReentrancyGuard, IVault {
         delete minProfitBasisPoints[_token];
         delete stableTokens[_token];
         delete strictStableTokens[_token];
+        delete shortableTokens[_token];
         whitelistedTokenCount = whitelistedTokenCount.sub(1);
     }
 
-    function withdrawFees(address _token, address _receiver) external nonReentrant returns (uint256) {
+    function withdrawFees(address _token, address _receiver) external override returns (uint256) {
         _onlyGov();
         uint256 amount = feeReserves[_token];
         if(amount == 0) { return 0; }
@@ -323,11 +328,11 @@ contract Vault is ReentrancyGuard, IVault {
         _transferOut(_token, amount, _receiver);
     }
 
-    function addRouter(address _router) external nonReentrant {
+    function addRouter(address _router) external {
         approvedRouters[msg.sender][_router] = true;
     }
 
-    function removeRouter(address _router) external nonReentrant {
+    function removeRouter(address _router) external {
         approvedRouters[msg.sender][_router] = false;
     }
 
@@ -1000,12 +1005,10 @@ contract Vault is ReentrancyGuard, IVault {
             return;
         }
 
-        // _indexToken is intentionally not enforced to be a whitelisted token for shorts
-        // it just needs to have a valid priceFeed
-        // this adds flexbility by allowing shorting on non-whitelisted tokens
         require(whitelistedTokens[_collateralToken], "Vault: _collateralToken not whitelisted");
         require(stableTokens[_collateralToken], "Vault: _collateralToken must be a stableToken");
         require(!stableTokens[_indexToken], "Vault: _indexToken must not be a stableToken");
+        require(shortableTokens[_indexToken], "Vault: _indexToken not shortable");
     }
 
     function _collectSwapFees(address _token, uint256 _amount, bool _isStableSwap) private returns (uint256) {

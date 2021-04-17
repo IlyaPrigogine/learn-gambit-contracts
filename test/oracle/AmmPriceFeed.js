@@ -61,7 +61,8 @@ describe("AmmPriceFeed", function () {
         9000, // _redemptionBps
         75, // _minProfitBps
         true, // _isStable
-        true // _isStrictStable
+        true, // _isStrictStable
+        false // _isShortable
     )
 
     bnbBusdPair = newWallet()

@@ -81,7 +81,8 @@ describe("Vault.getPrice", function () {
       9000, // _redemptionBps
       75, // _minProfitBps
       true, // _isStable
-      true // _isStrictStable
+      true, // _isStrictStable
+      false // _isShortable
     )
 
     expect(await vault.getPrice(usdc.address, true)).eq(expandDecimals(1, 30))
@@ -118,7 +119,8 @@ describe("Vault.getPrice", function () {
         9000, // _redemptionBps
         75, // _minProfitBps
         true, // _isStable
-        true // _isStrictStable
+        true, // _isStrictStable
+        false // _isShortable
     )
 
     const bnbBusdPair = newWallet()

@@ -65,9 +65,24 @@ describe("Vault.increaseShortPosition", function () {
       .to.be.revertedWith("Vault: _indexToken must not be a stableToken")
 
     await expect(vault.connect(user0).increasePosition(user0.address, dai.address, btc.address, toUsd(1000), false))
-      .to.be.revertedWith("Vault: invalid price feed")
+      .to.be.revertedWith("Vault: _indexToken not shortable")
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
+    await vault.setTokenConfig(
+      btc.address, // _token
+      btcPriceFeed.address, // _priceFeed
+      8, // _priceDecimals
+      8, // _tokenDecimals
+      9000, // _redemptionBps
+      75, // _minProfitBps
+      false, // _isStable
+      false, // _isStrictStable
+      false // _isShortable
+    )
+
+    await expect(vault.connect(user0).increasePosition(user0.address, dai.address, btc.address, toUsd(1000), false))
+      .to.be.revertedWith("Vault: _indexToken not shortable")
+
     await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
