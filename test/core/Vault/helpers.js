@@ -8,7 +8,8 @@ async function initVault(vault, router, usdg) {
       expandDecimals(600 * 1000, 18),
       expandDecimals(100 * 1000, 18),
       toUsd(5),
-      600
+      600,
+      10000000000 // 10 gwei
     )
 }
 

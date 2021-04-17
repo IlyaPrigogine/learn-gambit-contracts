@@ -101,6 +101,17 @@ describe("Vault.settings", function () {
     expect(await vault.ammPriceFeed()).eq(user1.address)
   })
 
+  it("setMaxStrictPriceDeviation", async () => {
+    await expect(vault.connect(user0).setMaxStrictPriceDeviation(100))
+      .to.be.revertedWith("Vault: forbidden")
+
+    await vault.setGov(user0.address)
+
+    expect(await vault.maxStrictPriceDeviation()).eq(0)
+    await vault.connect(user0).setMaxStrictPriceDeviation(100)
+    expect(await vault.maxStrictPriceDeviation()).eq(100)
+  })
+
   it("setMaxUsdg", async () => {
     await expect(vault.connect(user0).setMaxUsdg(500, 1000))
       .to.be.revertedWith("Vault: forbidden")
@@ -140,6 +151,17 @@ describe("Vault.settings", function () {
     expect(await vault.priceSampleSpace()).eq(3)
     await vault.connect(user0).setPriceSampleSpace(1)
     expect(await vault.priceSampleSpace()).eq(1)
+  })
+
+  it("setMaxStrictPriceDeviation", async () => {
+    await expect(vault.connect(user0).setMaxGasPrice(5000000000))
+      .to.be.revertedWith("Vault: forbidden")
+
+    await vault.setGov(user0.address)
+
+    expect(await vault.maxGasPrice()).eq(10000000000)
+    await vault.connect(user0).setMaxGasPrice(5000000000)
+    expect(await vault.maxGasPrice()).eq(5000000000)
   })
 
   it("setFees", async () => {

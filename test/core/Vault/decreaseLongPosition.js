@@ -53,6 +53,8 @@ describe("Vault.decreaseLongPosition", function () {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
     await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
 
+    await expect(vault.connect(user1).decreasePosition(user0.address, btc.address, btc.address, 0, 0, true, user2.address, { gasPrice: "11000000000" }))
+      .to.be.revertedWith("Vault: maxGasPrice exceeded")
     await expect(vault.connect(user1).decreasePosition(user0.address, btc.address, btc.address, 0, 0, true, user2.address))
       .to.be.revertedWith("Vault: invalid msg.sender")
     await expect(vault.connect(user0).decreasePosition(user0.address, btc.address, bnb.address, 0, toUsd(1000), true, user2.address))

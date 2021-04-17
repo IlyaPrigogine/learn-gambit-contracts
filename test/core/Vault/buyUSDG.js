@@ -50,6 +50,9 @@ describe("Vault.buyUSDG", function () {
   })
 
   it("buyUSDG", async () => {
+    await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address, { gasPrice: "11000000000" }))
+      .to.be.revertedWith("Vault: maxGasPrice exceeded")
+
     await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
       .to.be.revertedWith("Vault: minting not enabled")
 
@@ -75,7 +78,7 @@ describe("Vault.buyUSDG", function () {
 
     await bnb.mint(user0.address, 100)
     await bnb.connect(user0).transfer(vault.address, 100)
-    const tx = await vault.connect(user0).buyUSDG(bnb.address, user1.address)
+    const tx = await vault.connect(user0).buyUSDG(bnb.address, user1.address, { gasPrice: "10000000000" })
     await reportGasUsed(provider, tx, "buyUSDG gas used")
 
     expect(await usdg.balanceOf(user0.address)).eq(0)

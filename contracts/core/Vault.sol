@@ -60,9 +60,10 @@ contract Vault is ReentrancyGuard, IVault {
 
     uint256 public fundingInterval = 8 hours;
     uint256 public override fundingRateFactor;
+    uint256 public maxGasPrice;
 
     bool public includeAmmPrice = true;
-    bool public useStrictStablePrice = true;
+    uint256 public maxStrictPriceDeviation = 0;
 
     mapping (address => mapping (address => bool)) public approvedRouters;
 
@@ -74,7 +75,7 @@ contract Vault is ReentrancyGuard, IVault {
     mapping (address => uint256) public minProfitBasisPoints;
     mapping (address => bool) public stableTokens;
     // Chainlink can return prices for stablecoins
-    // that are more than 0.04% (fee amount) higher than 1 USD
+    // that differs from 1 USD by a larger percentage than stableSwapFeeBasisPoints
     // we use strictStableTokens to cap the price to 1 USD
     // this allows us to configure stablecoins like DAI as being a stableToken
     // while not being a strictStableToken
@@ -187,7 +188,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _maxUsdgBatchSize,
         uint256 _maxUsdgBuffer,
         uint256 _liquidationFeeUsd,
-        uint256 _fundingRateFactor
+        uint256 _fundingRateFactor,
+        uint256 _maxGasPrice
     ) external nonReentrant {
         _onlyGov();
         require(!isInitialized, "Vault: already initialized");
@@ -199,6 +201,7 @@ contract Vault is ReentrancyGuard, IVault {
         maxUsdgBuffer = _maxUsdgBuffer;
         liquidationFeeUsd = _liquidationFeeUsd;
         fundingRateFactor = _fundingRateFactor;
+        maxGasPrice = _maxGasPrice;
     }
 
     function enableMinting() external {
@@ -211,9 +214,9 @@ contract Vault is ReentrancyGuard, IVault {
         gov = _gov;
     }
 
-    function setUseStrictStablePrices(bool _useStrictStablePrice) external {
+    function setMaxStrictPriceDeviation(uint256 _maxStrictPriceDeviation) external {
         _onlyGov();
-        useStrictStablePrice = _useStrictStablePrice;
+        maxStrictPriceDeviation = _maxStrictPriceDeviation;
     }
 
     function setAmmPriceFeed(address _ammPriceFeed) external {
@@ -237,6 +240,12 @@ contract Vault is ReentrancyGuard, IVault {
         _onlyGov();
         require(_priceSampleSpace > 0, "Vault: invalid _priceSampleSpace");
         priceSampleSpace = _priceSampleSpace;
+    }
+
+    function setMaxGasPrice(uint256 _maxGasPrice) external {
+        _onlyGov();
+        require(_maxGasPrice > 0, "Vault: invalid _maxGasPrice");
+        maxGasPrice = _maxGasPrice;
     }
 
     function setFees(
@@ -333,6 +342,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
+        _validateGasPrice();
         if (msg.sender != gov) {
             require(isMintingEnabled, "Vault: minting not enabled");
         }
@@ -353,10 +363,6 @@ contract Vault is ReentrancyGuard, IVault {
         _increaseUsdgAmount(_token, usdgAmount);
         _increasePoolAmount(_token, amountAfterFees);
 
-        // the max USDG amount is only validated on minting and not swaps
-        // as this max value is only meant to help balance assets, it does not force a balance
-        require(usdgAmounts[_token] <= getMaxUsdgAmount(), "Vault: max USDG exceeded");
-
         IUSDG(usdg).mint(_receiver, usdgAmount);
 
         emit BuyUSDG(_token, tokenAmount, usdgAmount);
@@ -365,6 +371,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function sellUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
+        _validateGasPrice();
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
 
         uint256 usdgAmount = _transferIn(usdg);
@@ -396,6 +403,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function swap(address _tokenIn, address _tokenOut, address _receiver) external override nonReentrant returns (uint256) {
+        _validateGasPrice();
         require(whitelistedTokens[_tokenIn], "Vault: _tokenIn not whitelisted");
         require(whitelistedTokens[_tokenOut], "Vault: _tokenOut not whitelisted");
         updateCumulativeFundingRate(_tokenIn);
@@ -429,6 +437,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function increasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external override nonReentrant {
+        _validateGasPrice();
         _validateRouter(_account);
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -484,6 +493,7 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function decreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external override nonReentrant returns (uint256) {
+        _validateGasPrice();
         _validateRouter(_account);
         _validateTokens(_collateralToken, _indexToken, _isLong);
         updateCumulativeFundingRate(_collateralToken);
@@ -627,13 +637,6 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function getPrice(address _token, bool _maximise) public view returns (uint256) {
-        // Chainlink can return prices for stablecoins
-        // that are more than 0.04% (fee amount) higher or lower than 1 USD
-        // strictStableTokens can be used to keep the price of the stablecoin at 1 USD
-        if (useStrictStablePrice && strictStableTokens[_token]) {
-            return ONE_USD;
-        }
-
         address priceFeedAddress = priceFeeds[_token];
         require(priceFeedAddress != address(0), "Vault: invalid price feed");
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
@@ -667,6 +670,13 @@ contract Vault is ReentrancyGuard, IVault {
         require(price > 0, "Vault: could not fetch price");
         // normalise price precision
         price = price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
+
+        if (strictStableTokens[_token]) {
+            uint256 delta = price > ONE_USD ? price.sub(ONE_USD) : ONE_USD.sub(price);
+            if (delta <= maxStrictPriceDeviation) {
+                return ONE_USD;
+            }
+        }
 
         return price;
     }
@@ -1047,6 +1057,7 @@ contract Vault is ReentrancyGuard, IVault {
 
     function _increaseUsdgAmount(address _token, uint256 _amount) private {
         usdgAmounts[_token] = usdgAmounts[_token].add(_amount);
+        require(usdgAmounts[_token] <= getMaxUsdgAmount(), "Vault: max USDG exceeded");
         emit IncreaseUsdgAmount(_token, _amount);
     }
 
@@ -1088,5 +1099,10 @@ contract Vault is ReentrancyGuard, IVault {
     // we have this validation as a function instead of a modifier to reduce contract size
     function _onlyGov() private view {
         require(msg.sender == gov, "Vault: forbidden");
+    }
+
+    // we have this validation as a function instead of a modifier to reduce contract size
+    function _validateGasPrice() private view {
+        require(tx.gasprice <= maxGasPrice, "Vault: maxGasPrice exceeded");
     }
 }

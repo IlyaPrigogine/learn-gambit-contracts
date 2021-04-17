@@ -52,6 +52,9 @@ describe("Vault.swap", function () {
   })
 
   it("swap", async () => {
+    await expect(vault.connect(user1).swap(bnb.address, btc.address, user2.address, { gasPrice: "11000000000" } ))
+      .to.be.revertedWith("Vault: maxGasPrice exceeded")
+
     await expect(vault.connect(user1).swap(bnb.address, btc.address, user2.address))
       .to.be.revertedWith("Vault: _tokenIn not whitelisted")
 
