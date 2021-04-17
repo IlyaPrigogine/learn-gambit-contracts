@@ -642,10 +642,6 @@ contract Vault is ReentrancyGuard, IVault {
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
 
         uint256 price = 0;
-        if (includeAmmPrice && ammPriceFeed != address(0)) {
-            price = IAmmPriceFeed(ammPriceFeed).getPrice(_token);
-        }
-
         uint80 roundId = priceFeed.latestRound();
 
         for (uint80 i = 0; i < priceSampleSpace; i++) {
@@ -670,6 +666,16 @@ contract Vault is ReentrancyGuard, IVault {
         require(price > 0, "Vault: could not fetch price");
         // normalise price precision
         price = price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
+
+        if (includeAmmPrice && ammPriceFeed != address(0)) {
+            uint256 ammPrice = IAmmPriceFeed(ammPriceFeed).getPrice(_token);
+            if (_maximise && ammPrice > price) {
+                price = ammPrice;
+            }
+            if (!_maximise && ammPrice < price) {
+                price = ammPrice;
+            }
+        }
 
         if (strictStableTokens[_token]) {
             uint256 delta = price > ONE_USD ? price.sub(ONE_USD) : ONE_USD.sub(price);
