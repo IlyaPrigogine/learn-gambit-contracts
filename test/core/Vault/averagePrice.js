@@ -293,4 +293,97 @@ describe("Vault.averagePrice", function () {
     expect(delta[0]).eq(true)
     expect(delta[1]).eq("1111111111111111111111111111111") // ~1.111
   })
+
+  it("long position.averagePrice, buyPrice == averagePrice", async () => {
+    await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+
+    await btc.mint(user1.address, expandDecimals(1, 8))
+    await btc.connect(user1).transfer(vault.address, 250000) // 0.0025 BTC => 100 USD
+    await vault.buyUSDG(btc.address, user1.address)
+
+    await btc.mint(user0.address, expandDecimals(1, 8))
+    await btc.connect(user1).transfer(vault.address, 25000) // 0.00025 BTC => 10 USD
+    await vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(90), true)
+
+    let position = await vault.getPosition(user0.address, btc.address, btc.address, true)
+    expect(position[0]).eq(toUsd(90)) // size
+    expect(position[1]).eq(toUsd(9.91)) // collateral, 10 - 90 * 0.1%
+    expect(position[2]).eq(toNormalizedPrice(40000)) // averagePrice
+    expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(225000) // reserveAmount, 0.00225 * 40,000 => 90
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+
+    let delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(false)
+    expect(delta[1]).eq(0)
+
+    await btc.connect(user1).transfer(vault.address, 25000)
+    await vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(10), true)
+
+    position = await vault.getPosition(user0.address, btc.address, btc.address, true)
+    expect(position[0]).eq(toUsd(100)) // size
+    expect(position[1]).eq(toUsd(9.91 + 9.99)) // collateral
+    expect(position[2]).eq(toNormalizedPrice(40000)) // averagePrice
+    expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(225000 + 25000) // reserveAmount
+
+    delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(false)
+    expect(delta[1]).eq(0)
+  })
+
+  it("long position.averagePrice, buyPrice > averagePrice", async () => {
+    await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(40000))
+
+    await btc.mint(user1.address, expandDecimals(1, 8))
+    await btc.connect(user1).transfer(vault.address, 250000) // 0.0025 BTC => 100 USD
+    await vault.buyUSDG(btc.address, user1.address)
+
+    await btc.mint(user0.address, expandDecimals(1, 8))
+    await btc.connect(user1).transfer(vault.address, 25000) // 0.00025 BTC => 10 USD
+    await vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(90), true)
+
+    let position = await vault.getPosition(user0.address, btc.address, btc.address, true)
+    expect(position[0]).eq(toUsd(90)) // size
+    expect(position[1]).eq(toUsd(9.91)) // collateral, 10 - 90 * 0.1%
+    expect(position[2]).eq(toNormalizedPrice(40000)) // averagePrice
+    expect(position[3]).eq(0) // entryFundingRate
+    expect(position[4]).eq(225000) // reserveAmount, 0.00225 * 40,000 => 90
+
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
+
+    let delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(true)
+    expect(delta[1]).eq(toUsd(22.5))
+
+    await btc.connect(user1).transfer(vault.address, 25000)
+    await vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(10), true)
+
+    position = await vault.getPosition(user0.address, btc.address, btc.address, true)
+    expect(position[0]).eq(toUsd(100)) // size
+    expect(position[2]).eq("40816326530612244897959183673469387") // averagePrice
+
+    delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
+    expect(delta[0]).eq(true)
+    expect(delta[1]).eq(toUsd(22.5))
+  })
 })

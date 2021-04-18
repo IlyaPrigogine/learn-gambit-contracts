@@ -94,8 +94,8 @@ describe("Vault.swap", function () {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(100000))
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(80000))
 
-    await bnb.mint(user1.address, expandDecimals(200, 18))
-    await bnb.connect(user1).transfer(vault.address, expandDecimals(200, 18))
+    await bnb.mint(user1.address, expandDecimals(100, 18))
+    await bnb.connect(user1).transfer(vault.address, expandDecimals(100, 18))
 
     expect(await btc.balanceOf(user1.address)).eq(0)
     expect(await btc.balanceOf(user2.address)).eq(0)
@@ -103,15 +103,15 @@ describe("Vault.swap", function () {
     await reportGasUsed(provider, tx, "swap gas used")
 
     expect(await btc.balanceOf(user1.address)).eq(0)
-    expect(await btc.balanceOf(user2.address)).eq(expandDecimals(8, 7).sub("240000")) // 0.8 - 0.0024
+    expect(await btc.balanceOf(user2.address)).eq(expandDecimals(4, 7).sub("120000")) // 0.8 - 0.0012
 
     expect(await vault.feeReserves(bnb.address)).eq("600000000000000000") // 200 * 0.3% => 0.6
-    expect(await vault.usdgAmounts(bnb.address)).eq(expandDecimals(200 * 400, 18).add(expandDecimals(200 * 300, 18)).sub(expandDecimals(180, 18)))
-    expect(await vault.poolAmounts(bnb.address)).eq(expandDecimals(200, 18).add(expandDecimals(200, 18)).sub("600000000000000000"))
+    expect(await vault.usdgAmounts(bnb.address)).eq(expandDecimals(100 * 400, 18).add(expandDecimals(200 * 300, 18)).sub(expandDecimals(180, 18)))
+    expect(await vault.poolAmounts(bnb.address)).eq(expandDecimals(100, 18).add(expandDecimals(200, 18)).sub("600000000000000000"))
 
-    expect(await vault.feeReserves(btc.address)).eq("540000") // 1 * 0.3% => 0.003, 0.8 * 0.3% => 0.0024
-    expect(await vault.usdgAmounts(btc.address)).eq(0)
-    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub("300000").sub(expandDecimals(8, 7))) // 19700000, 0.197 BTC, 0.197 * 100,000 => 19700
+    expect(await vault.feeReserves(btc.address)).eq("420000") // 1 * 0.3% => 0.003, 0.4 * 0.3% => 0.0012
+    expect(await vault.usdgAmounts(btc.address)).eq(expandDecimals(200 * 300, 18).sub(expandDecimals(180, 18)).sub(expandDecimals(100 * 400, 18)))
+    expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub("300000").sub(expandDecimals(4, 7))) // 59700000, 0.597 BTC, 0.597 * 100,000 => 59700
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(400))
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(500))
@@ -119,13 +119,15 @@ describe("Vault.swap", function () {
 
     expect(await bnb.balanceOf(user0.address)).eq(0)
     expect(await bnb.balanceOf(user3.address)).eq(0)
-    await usdg.connect(user0).transfer(vault.address, expandDecimals(90000, 18))
+    await usdg.connect(user0).transfer(vault.address, expandDecimals(50000, 18))
     await vault.sellUSDG(bnb.address, user3.address)
     expect(await bnb.balanceOf(user0.address)).eq(0)
-    expect(await bnb.balanceOf(user3.address)).eq("179460000000000000000") // 179.46, 90000 / 500 * 99.7%
+    expect(await bnb.balanceOf(user3.address)).eq("99700000000000000000") // 99.7, 50000 / 500 * 99.7%
 
-    await usdg.connect(user0).transfer(vault.address, expandDecimals(20000, 18))
+    await usdg.connect(user0).transfer(vault.address, expandDecimals(50000, 18))
+    await vault.sellUSDG(btc.address, user3.address)
 
+    await usdg.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
     await expect(vault.sellUSDG(btc.address, user3.address))
       .to.be.revertedWith("Vault: poolAmount exceeded")
   })
