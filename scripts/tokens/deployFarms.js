@@ -1,4 +1,4 @@
-const { deployContract, contractAt } = require("../shared/helpers")
+const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
