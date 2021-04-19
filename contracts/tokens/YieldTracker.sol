@@ -60,6 +60,18 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
         return tokenAmount;
     }
 
+    function claimable(address _account) external view returns (uint256) {
+        uint256 stakedBalance = IYieldToken(yieldToken).stakedBalance(_account);
+        if (stakedBalance == 0) {
+            return claimableReward[_account];
+        }
+        uint256 pendingRewards = IDistributor(distributor).getDistributionAmount(address(this));
+        uint256 totalStaked = IYieldToken(yieldToken).totalStaked();
+        uint256 nextCumulativeRewardPerToken = cumulativeRewardPerToken.add(pendingRewards.div(totalStaked));
+        return claimableReward[_account].add(
+            stakedBalance.mul(nextCumulativeRewardPerToken.sub(previousCumulatedRewardPerToken[_account])).div(PRECISION));
+    }
+
     function updateRewards(address _account) public override nonReentrant {
         uint256 blockReward;
 
@@ -68,11 +80,11 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
         }
 
         uint256 _cumulativeRewardPerToken = cumulativeRewardPerToken;
-        uint256 totalSupply = IYieldToken(yieldToken).totalStaked();
-        // only update cumulativeRewardPerToken when there are stakers, i.e. when totalSupply > 0
+        uint256 totalStaked = IYieldToken(yieldToken).totalStaked();
+        // only update cumulativeRewardPerToken when there are stakers, i.e. when totalStaked > 0
         // if blockReward == 0, then there will be no change to cumulativeRewardPerToken
-        if (totalSupply > 0 && blockReward > 0) {
-            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.mul(PRECISION).div(totalSupply));
+        if (totalStaked > 0 && blockReward > 0) {
+            _cumulativeRewardPerToken = _cumulativeRewardPerToken.add(blockReward.mul(PRECISION).div(totalStaked));
             cumulativeRewardPerToken = _cumulativeRewardPerToken;
         }
 
@@ -83,10 +95,10 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
         }
 
         if (_account != address(0)) {
-            uint256 balance = IYieldToken(yieldToken).stakedBalance(_account);
+            uint256 stakedBalance = IYieldToken(yieldToken).stakedBalance(_account);
             uint256 _previousCumulatedReward = previousCumulatedRewardPerToken[_account];
             uint256 _claimableReward = claimableReward[_account].add(
-                balance.mul(_cumulativeRewardPerToken.sub(_previousCumulatedReward)).div(PRECISION)
+                stakedBalance.mul(_cumulativeRewardPerToken.sub(_previousCumulatedReward)).div(PRECISION)
             );
 
             claimableReward[_account] = _claimableReward;

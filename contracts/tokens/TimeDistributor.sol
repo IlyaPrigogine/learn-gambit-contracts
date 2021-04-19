@@ -69,7 +69,7 @@ contract TimeDistributor is IDistributor {
         return amount;
     }
 
-    function getDistributionAmount(address _receiver) public view returns (uint256) {
+    function getDistributionAmount(address _receiver) public override view returns (uint256) {
         uint256 _tokensPerInterval = tokensPerInterval[_receiver];
         if (_tokensPerInterval == 0) { return 0; }
 
