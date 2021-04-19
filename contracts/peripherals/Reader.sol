@@ -6,9 +6,37 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/math/SafeMath.sol";
 
 import "../core/interfaces/IVault.sol";
+import "../tokens/interfaces/IYieldTracker.sol";
+import "../amm/interfaces/IPancakeFactory.sol";
 
 contract Reader {
     using SafeMath for uint256;
+
+    function getStakingInfo(address _account, address[] memory _yieldTrackers) public view returns (uint256[] memory) {
+        uint256 propsLength = 2;
+        uint256[] memory amounts = new uint256[](_yieldTrackers.length * propsLength);
+        for (uint256 i = 0; i < _yieldTrackers.length; i++) {
+            IYieldTracker yieldTracker = IYieldTracker(_yieldTrackers[i]);
+            amounts[i * propsLength] = yieldTracker.claimable(_account);
+            amounts[i * propsLength + 1] = yieldTracker.getTokensPerInterval();
+        }
+        return amounts;
+    }
+
+    function getPairInfo(address _factory, address[] memory _tokens) public view returns (uint256[] memory) {
+        uint256 inputLength = 2;
+        uint256 propsLength = 2;
+        uint256[] memory amounts = new uint256[](_tokens.length * propsLength);
+        for (uint256 i = 0; i < _tokens.length / inputLength; i++) {
+            address token0 = _tokens[i * inputLength];
+            address token1 = _tokens[i * inputLength + 1];
+            address pair = IPancakeFactory(_factory).getPair(token0, token1);
+
+            amounts[i * propsLength] = IERC20(token0).balanceOf(pair);
+            amounts[i * propsLength + 1] = IERC20(token1).balanceOf(pair);
+        }
+        return amounts;
+    }
 
     function getFundingRates(address _vault, address _weth, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256 propsLength = 2;
@@ -47,6 +75,22 @@ contract Reader {
                 continue;
             }
             balances[i] = IERC20(token).balanceOf(_account);
+        }
+        return balances;
+    }
+
+    function getTokenBalancesWithSupplies(address _account, address[] memory _tokens) public view returns (uint256[] memory) {
+        uint256 propsLength = 2;
+        uint256[] memory balances = new uint256[](_tokens.length * propsLength);
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            address token = _tokens[i];
+            if (token == address(0)) {
+                balances[i * propsLength] = _account.balance;
+                balances[i * propsLength + 1] = 0;
+                continue;
+            }
+            balances[i * propsLength] = IERC20(token).balanceOf(_account);
+            balances[i * propsLength + 1] = IERC20(token).totalSupply();
         }
         return balances;
     }

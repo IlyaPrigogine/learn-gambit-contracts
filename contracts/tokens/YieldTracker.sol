@@ -60,7 +60,11 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
         return tokenAmount;
     }
 
-    function claimable(address _account) external view returns (uint256) {
+    function getTokensPerInterval() external override view returns (uint256) {
+        return IDistributor(distributor).tokensPerInterval(address(this));
+    }
+
+    function claimable(address _account) external override view returns (uint256) {
         uint256 stakedBalance = IYieldToken(yieldToken).stakedBalance(_account);
         if (stakedBalance == 0) {
             return claimableReward[_account];

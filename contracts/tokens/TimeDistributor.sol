@@ -16,7 +16,7 @@ contract TimeDistributor is IDistributor {
     address public gov;
 
     mapping (address => address) public rewardTokens;
-    mapping (address => uint256) public tokensPerInterval;
+    mapping (address => uint256) public override tokensPerInterval;
     mapping (address => uint256) public lastDistributionTime;
 
     event Distribute(address receiver, uint256 amount);

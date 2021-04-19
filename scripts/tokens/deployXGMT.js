@@ -2,9 +2,9 @@ const { deployContract } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
-  const initialSupply = expandDecimals(401 * 1000, 18)
-  const gmt = await deployContract("GMT", [initialSupply])
-  return { gmt }
+  const initialSupply = expandDecimals(100 * 1000, 18)
+  const xgmt = await deployContract("YieldToken", ["xGambit", "xGMT", initialSupply])
+  return { xgmt }
 }
 
 main()
