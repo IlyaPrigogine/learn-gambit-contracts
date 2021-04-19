@@ -60,7 +60,9 @@ contract Vault is ReentrancyGuard, IVault {
 
     uint256 public fundingInterval = 8 hours;
     uint256 public override fundingRateFactor;
+
     uint256 public maxGasPrice;
+    uint256 public maxDebtBasisPoints;
 
     bool public includeAmmPrice = true;
     uint256 public maxStrictPriceDeviation = 0;
@@ -141,7 +143,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 size,
         uint256 collateral,
         uint256 reserveAmount,
-        int256 realisedPnl
+        int256 realisedPnl,
+        uint256 markPrice
     );
     event UpdatePosition(
         bytes32 key,
@@ -191,7 +194,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _maxUsdgBuffer,
         uint256 _liquidationFeeUsd,
         uint256 _fundingRateFactor,
-        uint256 _maxGasPrice
+        uint256 _maxGasPrice,
+        uint256 _maxDebtBasisPoints
     ) external {
         _onlyGov();
         require(!isInitialized, "Vault: already initialized");
@@ -204,6 +208,7 @@ contract Vault is ReentrancyGuard, IVault {
         liquidationFeeUsd = _liquidationFeeUsd;
         fundingRateFactor = _fundingRateFactor;
         maxGasPrice = _maxGasPrice;
+        maxDebtBasisPoints = _maxDebtBasisPoints;
     }
 
     function enableMinting() external {
@@ -248,6 +253,12 @@ contract Vault is ReentrancyGuard, IVault {
         _onlyGov();
         require(_maxGasPrice > 0, "Vault: invalid _maxGasPrice");
         maxGasPrice = _maxGasPrice;
+    }
+
+    function setMaxDebtBasisPoints(uint256 _maxDebtBasisPoints) external {
+        _onlyGov();
+        require(_maxDebtBasisPoints > 0, "Vault: invalid _maxDebtBasisPoints");
+        maxDebtBasisPoints = _maxDebtBasisPoints;
     }
 
     function setFees(
@@ -434,6 +445,11 @@ contract Vault is ReentrancyGuard, IVault {
         _increasePoolAmount(_tokenIn, amountIn);
         _decreasePoolAmount(_tokenOut, amountOut);
 
+        uint256 usdgDebt = usdgAmounts[_tokenOut].mul(PRICE_PRECISION).div(10 ** USDG_DECIMALS);
+        if (!stableTokens[_tokenOut] && getRedemptionCollateralUsd(_tokenOut).mul(maxDebtBasisPoints) < usdgDebt.mul(BASIS_POINTS_DIVISOR)) {
+            revert("Vault: max debt exceeded");
+        }
+
         _transferOut(_tokenOut, amountOutAfterFees, _receiver);
 
         emit Swap(_tokenIn, _tokenOut, amountIn, amountOutAfterFees);
@@ -579,7 +595,8 @@ contract Vault is ReentrancyGuard, IVault {
             _decreaseGuaranteedUsd(_collateralToken, position.size.sub(position.collateral));
         }
 
-        emit LiquidatePosition(key, _account, _collateralToken, _indexToken, _isLong, position.size, position.collateral, position.reserveAmount, position.realisedPnl);
+        uint256 markPrice = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
+        emit LiquidatePosition(key, _account, _collateralToken, _indexToken, _isLong, position.size, position.collateral, position.reserveAmount, position.realisedPnl, markPrice);
 
         if (!_isLong && marginFees < position.collateral) {
             uint256 remainingCollateral = position.collateral.sub(marginFees);
@@ -841,7 +858,7 @@ contract Vault is ReentrancyGuard, IVault {
         return position.size.mul(BASIS_POINTS_DIVISOR).div(position.collateral);
     }
 
-    // for longs: nextAveragePrice = (nextPrice * nextSize)/ (delta + nextSize)
+    // for longs: nextAveragePrice = (nextPrice * nextSize)/ (nextSize + delta)
     // for shorts: nextAveragePrice = (nextPrice * nextSize) / (nextSize - delta)
     function getNextAveragePrice(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong, uint256 _nextPrice, uint256 _sizeDelta) public view returns (uint256) {
         (bool hasProfit, uint256 delta) = getDelta(_indexToken, _size, _averagePrice, _isLong);

@@ -3,13 +3,14 @@ const { toUsd } = require("../../shared/units")
 
 async function initVault(vault, router, usdg) {
     await vault.initialize(
-      router.address,
-      usdg.address,
-      expandDecimals(600 * 1000, 18),
-      expandDecimals(100 * 1000, 18),
-      toUsd(5),
-      600,
-      10000000000 // 10 gwei
+      router.address, // router
+      usdg.address, // usdg
+      expandDecimals(600 * 1000, 18), // maxUsdgBatchSize
+      expandDecimals(100 * 1000, 18), // maxUsdgBuffer
+      toUsd(5), // liquidationFeeUsd
+      600, // fundingRateFactor
+      10000000000, // maxGasPrice, 10 gwei
+      20000 // maxDebtBasisPoints
     )
 }
 
