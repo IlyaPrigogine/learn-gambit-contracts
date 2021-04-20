@@ -53,6 +53,15 @@ async function main() {
   await sendTxn(xgmtUsdgFarmDistributorWbnb.setDistribution([xgmtUsdgFarmYieldTrackerWbnb.address], ["500000000000000000"], [wbnb.address]), "gmtUsdgFarmDistributorWbnb.setDistribution")
 
   await sendTxn(xgmtUsdgFarm.setYieldTrackers([xgmtUsdgFarmYieldTrackerXgmt.address, xgmtUsdgFarmYieldTrackerWbnb.address]), "xgmtUsdgFarm.setYieldTrackers")
+
+  await sendTxn(wbnb.deposit({ value: expandDecimals(40, 18) }), "wbnb.deposit")
+  await sendTxn(wbnb.transfer(usdgRewardDistributor.address, expandDecimals(10, 18)), "wbnb.transfer(usdgRewardDistributor)")
+  await sendTxn(wbnb.transfer(xgmtRewardDistributor.address, expandDecimals(10, 18)), "wbnb.transfer(xgmtRewardDistributor)")
+  await sendTxn(wbnb.transfer(gmtUsdgFarmDistributorWbnb.address, expandDecimals(10, 18)), "wbnb.transfer(gmtUsdgFarmDistributorWbnb)")
+  await sendTxn(wbnb.transfer(xgmtUsdgFarmDistributorWbnb.address, expandDecimals(10, 18)), "wbnb.transfer(xgmtUsdgFarmDistributorWbnb)")
+
+  await sendTxn(xgmt.transfer(gmtUsdgFarmDistributorXgmt.address, expandDecimals(100, 18)), "xgmt.transfer(gmtUsdgFarmDistributorXgmt)")
+  await sendTxn(xgmt.transfer(xgmtUsdgFarmDistributorXgmt.address, expandDecimals(100, 18)), "xgmt.transfer(xgmtUsdgFarmDistributorXgmt)")
 }
 
 main()

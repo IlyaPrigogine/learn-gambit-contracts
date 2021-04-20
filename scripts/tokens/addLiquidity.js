@@ -41,8 +41,8 @@ async function main() {
   await sendTxn(router.addLiquidity(
     wbnb.address, // tokenA
     busd.address, // tokenB
-    expandDecimals(100, 18), // amountADesired
-    expandDecimals(52500, 18), // amountBDesired
+    expandDecimals(10, 18), // amountADesired
+    expandDecimals(5250, 18), // amountBDesired
     0, // amountAMin
     0, // amountBMin
     wallet.address, // to
