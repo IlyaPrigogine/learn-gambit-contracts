@@ -15,6 +15,9 @@ contract AmmPriceFeed is IAmmPriceFeed {
 
     uint256 constant PRICE_PRECISION = 10 ** 30;
 
+    address public gov;
+    bool public isInitialized;
+
     address public vault;
     address public factory;
 
@@ -23,7 +26,15 @@ contract AmmPriceFeed is IAmmPriceFeed {
     address public bnb;
     address public busd;
 
-    constructor(address[] memory _addresses) public {
+    constructor() public {
+        gov = msg.sender;
+    }
+
+    function initialize(address[] memory _addresses) external {
+        require(msg.sender == gov, "AmmPriceFeed: forbidden");
+        require(!isInitialized, "AmmPriceFeed: already initialized");
+        isInitialized = true;
+
         vault = _addresses[0];
         factory = _addresses[1];
 

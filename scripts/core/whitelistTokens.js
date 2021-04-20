@@ -2,56 +2,89 @@ const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
-  // TODO: update BTC decimals
-  const vault = await contractAt("Vault", "0x96EE5959d640Bf6F7BdEcAf55E65Cb8b5fD09856")
-  const busdPriceFeed = { address: "0x532Ea3DffE5a4376Db88AC69484D5d62F277cf98" }
+  const vault = await contractAt("Vault", "0x1DA070aC7a7f149c2FF0e3D17487B1389Cb96ab1")
+  const redemptionBasisPoints = 10000
 
-  const redemptionBasisPoints = 10000 * 2
-
-  const btc = { address: "0x341F41c455fB3E08A1078D1a9c4dAd778c41E7C4" }
-  const eth = { address: "0x6E9eef21FE69894f088bf6d27Dc36aa74898BA8c" }
-  const bnb = { address: "0x6A2345E019DB2aCC6007DCD3A69731F51D7Dca52" }
-  const busd = { address: "0xae7486c680720159130b71e0f9EF7AFd8f413227" }
+  const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
+  const eth = { address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8" }
+  const bnb = { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" }
+  const busd = { address: "0xe9e7cea3dedca5984780bafc599bd69add087d56" }
+  const usdc = { address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d" }
+  const usdt = { address: "0x55d398326f99059fF775485246999027B3197955" }
 
   await sendTxn(vault.setTokenConfig(
     btc.address, // _token
-    "0x5741306c21795FdCBb9b265Ea0255F499DFe515C", // _priceFeed
+    "0x264990fbd0A4796A3E3d8E37C4d5F87a3aCa5Ebf", // _priceFeed
     8, // _priceDecimals
-    8, // _tokenDecimals
+    18, // _tokenDecimals
     redemptionBasisPoints, // _redemptionBps
-    75, // _minProfitBps
-    false // _isStable
+    0, // _minProfitBps
+    false, // _isStable
+    false, // _isStrictStable
+    true // _isShortable
   ), "vault.setTokenConfig(btc)")
 
   await sendTxn(vault.setTokenConfig(
     eth.address, // _token
-    "0x143db3CEEfbdfe5631aDD3E50f7614B6ba708BA7", // _priceFeed
+    "0x9ef1B8c0E4F7dc8bF5719Ea496883DC6401d5b2e", // _priceFeed
     8, // _priceDecimals
     18, // _tokenDecimals
     redemptionBasisPoints, // _redemptionBps
-    75, // _minProfitBps
-    false // _isStable
+    0, // _minProfitBps
+    false, // _isStable
+    false, // _isStrictStable
+    true // _isShortable
   ), "vault.setTokenConfig(eth)")
 
   await sendTxn(vault.setTokenConfig(
     bnb.address, // _token
-    "0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526", // _priceFeed
+    "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE", // _priceFeed
     8, // _priceDecimals
     18, // _tokenDecimals
     redemptionBasisPoints, // _redemptionBps
-    125, // _minProfitBps
-    false // _isStable
+    0, // _minProfitBps
+    false, // _isStable
+    false, // _isStrictStable
+    true // _isShortable
   ), "vault.setTokenConfig(bnb)")
 
   await sendTxn(vault.setTokenConfig(
     busd.address, // _token
-    busdPriceFeed.address, // _priceFeed
+    "0xcBb98864Ef56E9042e7d2efef76141f15731B82f", // _priceFeed
     8, // _priceDecimals
     18, // _tokenDecimals
     redemptionBasisPoints, // _redemptionBps
-    125, // _minProfitBps
-    true // _isStable
+    0, // _minProfitBps
+    true, // _isStable
+    true, // _isStrictStable
+    false // _isShortable
   ), "vault.setTokenConfig(busd)")
+
+  await sendTxn(vault.setTokenConfig(
+    usdc.address, // _token
+    "0x51597f405303C4377E36123cBc172b13269EA163", // _priceFeed
+    8, // _priceDecimals
+    18, // _tokenDecimals
+    redemptionBasisPoints, // _redemptionBps
+    0, // _minProfitBps
+    true, // _isStable
+    true, // _isStrictStable
+    false // _isShortable
+  ), "vault.setTokenConfig(usdc)")
+
+  await sendTxn(vault.setTokenConfig(
+    usdt.address, // _token
+    "0xB97Ad0E74fa7d920791E90258A6E2085088b4320", // _priceFeed
+    8, // _priceDecimals
+    18, // _tokenDecimals
+    redemptionBasisPoints, // _redemptionBps
+    0, // _minProfitBps
+    true, // _isStable
+    true, // _isStrictStable
+    false // _isShortable
+  ), "vault.setTokenConfig(usdt)")
+
+  await sendTxn(vault.setAmmPriceFeed("0xcfc83185877Cc3b347050b934a07808f4ec864Fe"), "vault.setAmmPriceFeed")
 }
 
 main()

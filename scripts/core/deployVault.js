@@ -2,18 +2,50 @@ const { deployContract, contractAt , sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 const { toUsd } = require("../../test/shared/units")
 
-// TODO: set maxGasPrice, maxStrictPriceDeviation, maxUsdgBatchSize, maxUsdgBuffer
 async function main() {
-  const weth = { address: "0x6A2345E019DB2aCC6007DCD3A69731F51D7Dca52" }
+  const nativeToken = { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" }
   const vault = await deployContract("Vault", [])
   const usdg = await deployContract("USDG", [vault.address])
-  const router = await deployContract("Router", [vault.address, usdg.address, weth.address])
-  // const vault = await contractAt("Vault", "0x96EE5959d640Bf6F7BdEcAf55E65Cb8b5fD09856")
-  // const usdg = await contractAt("USDG", "0xd8fCB8ccEaB1e2EB7357C4E8483Fe0bb0AEEC8FF")
-  // const router = await contractAt("Router", "0xb4f81Fa74e06b5f762A104e47276BA9b2929cb27")
-  await sendTxn(vault.initialize(router.address, usdg.address, expandDecimals(20 * 1000 * 1000, 18), toUsd(5), 600), "vault.initialize")
-  await sendTxn(vault.setFees(20, 10, 10, toUsd(5)), "vault.setFees")
-  await sendTxn(vault.setPriceSampleSpace(1), "vault.setPriceSampleSpace")
+  const router = await deployContract("Router", [vault.address, usdg.address, nativeToken.address])
+  const ammFactory = { address: "0xbcfccbde45ce874adcb698cc183debcf17952812" }
+
+  const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
+  const eth = { address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8" }
+  const bnb = nativeToken
+  const busd = { address: "0xe9e7cea3dedca5984780bafc599bd69add087d56" }
+
+  const ammPriceFeed = await deployContract("AmmPriceFeed", [])
+
+  await sendTxn(ammPriceFeed.initialize([
+    vault.address,
+    ammFactory.address,
+    btc.address,
+    eth.address,
+    bnb.address,
+    busd.address
+  ]), "ammPriceFeed.initialize")
+
+  await sendTxn(vault.initialize(
+    router.address, // router
+    usdg.address, // usdg
+    expandDecimals(10, 18), // maxUsdgBatchSize
+    expandDecimals(5, 18), // maxUsdgBuffer
+    toUsd(5), //  liquidationFeeUsd
+    600, // fundingRateFactor
+    5000000000, // maxGasPrice, 5 gwei
+    20000 // maxDebtBasisPoints
+  ), "vault.initialize")
+
+  await sendTxn(vault.setMaxStrictPriceDeviation(expandDecimals(2, 28)), "vault.setMaxStrictPriceDeviation") // 0.02 USD
+
+  await sendTxn(vault.setFees(
+    20, // swapFeeBasisPoints
+    10, // stableSwapFeeBasisPoints
+    10, // marginFeeBasisPoints
+    toUsd(5) // liquidationFeeUsd
+  ), "vault.setFees")
+
+  await sendTxn(vault.setPriceSampleSpace(2), "vault.setPriceSampleSpace")
 }
 
 main()

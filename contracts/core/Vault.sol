@@ -691,11 +691,13 @@ contract Vault is ReentrancyGuard, IVault {
 
         if (!_excludeAmmPrice && includeAmmPrice && ammPriceFeed != address(0)) {
             uint256 ammPrice = IAmmPriceFeed(ammPriceFeed).getPrice(_token);
-            if (_maximise && ammPrice > price) {
-                price = ammPrice;
-            }
-            if (!_maximise && ammPrice < price) {
-                price = ammPrice;
+            if (ammPrice > 0) {
+                if (_maximise && ammPrice > price) {
+                    price = ammPrice;
+                }
+                if (!_maximise && ammPrice < price) {
+                    price = ammPrice;
+                }
             }
         }
 
