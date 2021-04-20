@@ -70,12 +70,14 @@ contract YieldToken is IERC20, IYieldToken {
 
     function addNonStakingAccount(address _account) external onlyAdmin {
         require(!nonStakingAccounts[_account], "YieldToken: _account already marked");
+        _updateRewards(_account);
         nonStakingAccounts[_account] = true;
         nonStakingSupply = nonStakingSupply.add(balances[_account]);
     }
 
     function removeNonStakingAccount(address _account) external onlyAdmin {
         require(nonStakingAccounts[_account], "YieldToken: _account not marked");
+        _updateRewards(_account);
         nonStakingAccounts[_account] = false;
         nonStakingSupply = nonStakingSupply.sub(balances[_account]);
     }
