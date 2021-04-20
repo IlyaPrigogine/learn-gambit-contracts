@@ -69,7 +69,7 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
         if (stakedBalance == 0) {
             return claimableReward[_account];
         }
-        uint256 pendingRewards = IDistributor(distributor).getDistributionAmount(address(this));
+        uint256 pendingRewards = IDistributor(distributor).getDistributionAmount(address(this)).mul(PRECISION);
         uint256 totalStaked = IYieldToken(yieldToken).totalStaked();
         uint256 nextCumulativeRewardPerToken = cumulativeRewardPerToken.add(pendingRewards.div(totalStaked));
         return claimableReward[_account].add(
