@@ -651,14 +651,14 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function getMaxPrice(address _token) public override view returns (uint256) {
-        return getPrice(_token, true);
+        return getPrice(_token, true, false);
     }
 
     function getMinPrice(address _token) public override view returns (uint256) {
-        return getPrice(_token, false);
+        return getPrice(_token, false, false);
     }
 
-    function getPrice(address _token, bool _maximise) public view returns (uint256) {
+    function getPrice(address _token, bool _maximise, bool _excludeAmmPrice) public view returns (uint256) {
         address priceFeedAddress = priceFeeds[_token];
         require(priceFeedAddress != address(0), "Vault: invalid price feed");
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
@@ -689,7 +689,7 @@ contract Vault is ReentrancyGuard, IVault {
         // normalise price precision
         price = price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
 
-        if (includeAmmPrice && ammPriceFeed != address(0)) {
+        if (!_excludeAmmPrice && includeAmmPrice && ammPriceFeed != address(0)) {
             uint256 ammPrice = IAmmPriceFeed(ammPriceFeed).getPrice(_token);
             if (_maximise && ammPrice > price) {
                 price = ammPrice;
