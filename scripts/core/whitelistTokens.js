@@ -2,7 +2,8 @@ const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
-  const vault = await contractAt("Vault", "0x1DA070aC7a7f149c2FF0e3D17487B1389Cb96ab1")
+  const vault = await contractAt("Vault", "0xf153319DDC7Aa04d0c6F92b260c6e3bEB71a4fD5")
+  const ammPriceFeed = { address: "0x7cA0bC28B98f091E53dbfE6D9Fc5E8B65E2C27d0" }
   const redemptionBasisPoints = 10000
 
   const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
@@ -84,7 +85,7 @@ async function main() {
     false // _isShortable
   ), "vault.setTokenConfig(usdt)")
 
-  await sendTxn(vault.setAmmPriceFeed("0xcfc83185877Cc3b347050b934a07808f4ec864Fe"), "vault.setAmmPriceFeed")
+  await sendTxn(vault.setAmmPriceFeed(ammPriceFeed.address), "vault.setAmmPriceFeed")
 }
 
 main()
