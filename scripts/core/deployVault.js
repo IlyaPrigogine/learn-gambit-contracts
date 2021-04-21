@@ -28,7 +28,7 @@ async function main() {
   await sendTxn(vault.initialize(
     router.address, // router
     usdg.address, // usdg
-    expandDecimals(10, 18), // maxUsdgBatchSize
+    expandDecimals(60, 18), // maxUsdgBatchSize
     expandDecimals(5, 18), // maxUsdgBuffer
     toUsd(5), //  liquidationFeeUsd
     600, // fundingRateFactor
