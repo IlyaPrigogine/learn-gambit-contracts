@@ -28,6 +28,7 @@ interface IVault {
     function getRedemptionAmount(address _token, uint256 _usdgAmount) external view returns (uint256);
     function getMaxPrice(address _token) external view returns (uint256);
     function getMinPrice(address _token) external view returns (uint256);
+    function getPrice(address _token, bool _maximise, bool _excludeAmmPrice) external view returns (uint256);
 
     function getDelta(address _indexToken, uint256 _size, uint256 _averagePrice, bool _isLong) external view returns (bool, uint256);
     function getPosition(address _account, address _collateralToken, address _indexToken, bool _isLong) external view returns (uint256, uint256, uint256, uint256, uint256, uint256, bool);

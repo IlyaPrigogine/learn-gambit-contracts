@@ -359,7 +359,7 @@ contract Vault is ReentrancyGuard, IVault {
 
     function buyUSDG(address _token, address _receiver) external override nonReentrant returns (uint256) {
         _validateGasPrice();
-        if (receiver != gov) {
+        if (_receiver != gov) {
             require(isMintingEnabled, "Vault: minting not enabled");
         }
         require(whitelistedTokens[_token], "Vault: _token not whitelisted");
@@ -658,7 +658,7 @@ contract Vault is ReentrancyGuard, IVault {
         return getPrice(_token, false, false);
     }
 
-    function getPrice(address _token, bool _maximise, bool _excludeAmmPrice) public view returns (uint256) {
+    function getPrice(address _token, bool _maximise, bool _excludeAmmPrice) public override view returns (uint256) {
         address priceFeedAddress = priceFeeds[_token];
         require(priceFeedAddress != address(0), "Vault: invalid price feed");
         IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
