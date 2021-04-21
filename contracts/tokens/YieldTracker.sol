@@ -16,7 +16,7 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    uint256 constant PRECISION = 1e30;
+    uint256 public constant PRECISION = 1e30;
 
     address public gov;
     address public yieldToken;
