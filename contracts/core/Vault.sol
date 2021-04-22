@@ -213,7 +213,7 @@ contract Vault is ReentrancyGuard, IVault {
         maxDebtBasisPoints = _maxDebtBasisPoints;
     }
 
-    function enableMinting() external {
+    function enableMinting() external override {
         _onlyGov();
         isMintingEnabled = true;
     }
@@ -228,7 +228,7 @@ contract Vault is ReentrancyGuard, IVault {
         maxStrictPriceDeviation = _maxStrictPriceDeviation;
     }
 
-    function setAmmPriceFeed(address _ammPriceFeed) external {
+    function setAmmPriceFeed(address _ammPriceFeed) external override {
         _onlyGov();
         ammPriceFeed = _ammPriceFeed;
     }

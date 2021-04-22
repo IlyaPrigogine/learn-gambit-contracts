@@ -3,6 +3,8 @@
 pragma solidity 0.6.12;
 
 interface IVault {
+    function enableMinting() external;
+    function setAmmPriceFeed(address _ammPriceFeed) external;
     function setMaxStrictPriceDeviation(uint256 _maxStrictPriceDeviation) external;
     function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external;
     function setPriceSampleSpace(uint256 _priceSampleSpace) external;

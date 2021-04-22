@@ -31,6 +31,10 @@ contract Timelock {
         admin = msg.sender;
     }
 
+    function enableMinting(address _vault) external onlyAdmin {
+        IVault(_vault).enableMinting();
+    }
+
     function setMaxStrictPriceDeviation(address _vault, uint256 _maxStrictPriceDeviation) external onlyAdmin {
         IVault(_vault).setMaxStrictPriceDeviation(_maxStrictPriceDeviation);
     }
