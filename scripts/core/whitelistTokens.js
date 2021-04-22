@@ -2,8 +2,8 @@ const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
-  const vault = await contractAt("Vault", "0xf153319DDC7Aa04d0c6F92b260c6e3bEB71a4fD5")
-  const ammPriceFeed = { address: "0x7cA0bC28B98f091E53dbfE6D9Fc5E8B65E2C27d0" }
+  const vault = await contractAt("Vault", "0x303fc240C90BB000B156230e0bdDCeA9DB47cf1C")
+  const ammPriceFeed = { address: "0xF649e247B4dEfB9d1CbA2a7Ec4FB966E20C9D6f6" }
   const redemptionBasisPoints = 10000
 
   const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }

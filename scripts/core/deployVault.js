@@ -32,7 +32,7 @@ async function main() {
     expandDecimals(5, 18), // maxUsdgBuffer
     toUsd(5), //  liquidationFeeUsd
     600, // fundingRateFactor
-    5000000000, // maxGasPrice, 5 gwei
+    16000000000, // maxGasPrice, 16 gwei
     20000 // maxDebtBasisPoints
   ), "vault.initialize")
 
