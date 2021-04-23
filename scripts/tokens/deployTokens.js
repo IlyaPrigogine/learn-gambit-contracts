@@ -8,7 +8,6 @@ async function main() {
   await deployContract("FaucetToken", ["Binance USD", "BUSD", 18, expandDecimals(1000, 18)])
   const busdPriceFeed = await deployContract("PriceFeed", [])
   await sendTxn(busdPriceFeed.setLatestAnswer(100000000), "busdPriceFeed.setLatestAnswer")
-
 }
 
 main()
