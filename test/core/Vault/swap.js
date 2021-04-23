@@ -69,6 +69,9 @@ describe("Vault.swap", function () {
     await expect(vault.connect(user1).swap(bnb.address, btc.address, user2.address))
       .to.be.revertedWith("Vault: _tokenOut not whitelisted")
 
+    await expect(vault.connect(user1).swap(bnb.address, bnb.address, user2.address))
+      .to.be.revertedWith("Vault: invalid tokens")
+
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
     await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
