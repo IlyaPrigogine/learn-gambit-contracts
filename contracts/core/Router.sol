@@ -20,6 +20,8 @@ contract Router {
     address public usdg;
     address public vault;
 
+    event Swap(address account, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+
     constructor(address _vault, address _usdg, address _weth) public {
         vault = _vault;
         usdg = _usdg;
@@ -35,13 +37,15 @@ contract Router {
 
     function swap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) public {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
-        _swap(_path, _minOut, _receiver);
+        uint256 amountOut = _swap(_path, _minOut, _receiver);
+        emit Swap(msg.sender, _path[0], _path[_path.length - 1], _amountIn, amountOut);
     }
 
     function swapETHToTokens(address[] memory _path, uint256 _minOut, address _receiver) external payable {
         require(_path[0] == weth, "Router: invalid _path");
         _transferETHToVault();
-        _swap(_path, _minOut, _receiver);
+        uint256 amountOut = _swap(_path, _minOut, _receiver);
+        emit Swap(msg.sender, _path[0], _path[_path.length - 1], msg.value, amountOut);
     }
 
     function swapTokensToETH(address[] memory _path, uint256 _amountIn, uint256 _minOut, address payable _receiver) external {
@@ -49,6 +53,7 @@ contract Router {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         uint256 amountOut = _swap(_path, _minOut, address(this));
         _transferOutETH(amountOut, _receiver);
+        emit Swap(msg.sender, _path[0], _path[_path.length - 1], _amountIn, amountOut);
     }
 
     function increasePosition(address[] memory _path, address _indexToken, uint256 _amountIn, uint256 _minOut, uint256 _sizeDelta, bool _isLong, uint256 _price) external {
