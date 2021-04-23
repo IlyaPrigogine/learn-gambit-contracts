@@ -14,6 +14,7 @@ contract TimeDistributor is IDistributor {
 
     uint256 public constant DISTRIBUTION_INTERVAL = 1 hours;
     address public gov;
+    address public admin;
 
     mapping (address => address) public rewardTokens;
     mapping (address => uint256) public override tokensPerInterval;
@@ -21,18 +22,44 @@ contract TimeDistributor is IDistributor {
 
     event Distribute(address receiver, uint256 amount);
     event DistributionChange(address receiver, uint256 amount, address rewardToken);
+    event TokensPerIntervalChange(address receiver, uint256 amount);
+
+    modifier onlyGov() {
+        require(msg.sender == gov, "TimeDistributor: forbidden");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "TimeDistributor: forbidden");
+        _;
+    }
 
     constructor() public {
         gov = msg.sender;
+        admin = msg.sender;
     }
 
-    function getRewardToken(address _receiver) external override view returns (address) {
-        return rewardTokens[_receiver];
+    function setGov(address _gov) external onlyGov {
+        gov = _gov;
     }
 
-    function setDistribution(address[] calldata _receivers, uint256[] calldata _amounts, address[] calldata _rewardTokens) external {
-        require(msg.sender == gov, "TimeDistributor: forbidden");
+    function setTokensPerInterval(address _receiver, uint256 _amount) external onlyAdmin {
+        if (lastDistributionTime[_receiver] != 0) {
+            uint256 currentTime = block.timestamp;
+            uint256 timeDiff = currentTime.sub(lastDistributionTime[_receiver]);
+            uint256 intervals = timeDiff.div(DISTRIBUTION_INTERVAL);
+            require(intervals == 0, "TimeDistributor: pending distribution");
+        }
 
+        tokensPerInterval[_receiver] = _amount;
+        emit TokensPerIntervalChange(_receiver, _amount);
+    }
+
+    function setDistribution(
+        address[] calldata _receivers,
+        uint256[] calldata _amounts,
+        address[] calldata _rewardTokens
+    ) external onlyGov {
         for (uint256 i = 0; i < _receivers.length; i++) {
             address receiver = _receivers[i];
 
@@ -67,6 +94,10 @@ contract TimeDistributor is IDistributor {
 
         emit Distribute(msg.sender, amount);
         return amount;
+    }
+
+    function getRewardToken(address _receiver) external override view returns (address) {
+        return rewardTokens[_receiver];
     }
 
     function getDistributionAmount(address _receiver) public override view returns (uint256) {

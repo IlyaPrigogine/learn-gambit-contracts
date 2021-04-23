@@ -28,6 +28,20 @@ function getBnbConfig(bnb, bnbPriceFeed) {
   ]
 }
 
+function getEthConfig(eth, ethPriceFeed) {
+  return [
+    eth.address, // _token
+    ethPriceFeed.address, // _priceFeed
+    8, // _priceDecimals
+    18, // _tokenDecimals
+    9000, // _redemptionBps
+    75, // _minProfitBps
+    false, // _isStable
+    false, // _isStrictStable
+    true // _isShortable
+  ]
+}
+
 function getBtcConfig(btc, btcPriceFeed) {
   return [
     btc.address, // _token
@@ -56,4 +70,4 @@ function getDaiConfig(dai, daiPriceFeed) {
   ]
 }
 
-module.exports = { initVault, getBnbConfig, getBtcConfig, getDaiConfig }
+module.exports = { initVault, getBnbConfig, getBtcConfig, getEthConfig, getDaiConfig }

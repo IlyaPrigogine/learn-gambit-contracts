@@ -26,12 +26,16 @@ contract AmmPriceFeed is IAmmPriceFeed {
     address public bnb;
     address public busd;
 
+    modifier onlyGov() {
+        require(msg.sender == gov, "AmmPriceFeed: forbidden");
+        _;
+    }
+
     constructor() public {
         gov = msg.sender;
     }
 
-    function initialize(address[] memory _addresses) external {
-        require(msg.sender == gov, "AmmPriceFeed: forbidden");
+    function initialize(address[] memory _addresses) external onlyGov {
         require(!isInitialized, "AmmPriceFeed: already initialized");
         isInitialized = true;
 
@@ -42,6 +46,10 @@ contract AmmPriceFeed is IAmmPriceFeed {
         eth = _addresses[3];
         bnb = _addresses[4];
         busd = _addresses[5];
+    }
+
+    function setFactory(address _factory) external onlyGov {
+        factory = _factory;
     }
 
     function getPrice(address _token) external override view returns (uint256) {

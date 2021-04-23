@@ -47,6 +47,8 @@ describe("Vault.closeLongPosition", function () {
 
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
+
+    await vault.enableMinting()
   })
 
   it("close long position", async () => {

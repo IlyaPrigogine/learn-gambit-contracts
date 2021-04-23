@@ -49,6 +49,8 @@ describe("Timelock", function () {
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
 
+    await vault.setAmmPriceFeed(user3.address)
+
     timelock = await deployContract("Timelock", [])
     await vault.setGov(timelock.address)
   })
@@ -235,6 +237,57 @@ describe("Timelock", function () {
     await timelock.connect(wallet).cancelAction(action1)
 
     await expect(timelock.connect(wallet).setGov(vault.address, user2.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+  })
+
+  it("setAmmPriceFeed", async () => {
+    await expect(timelock.connect(user0).setAmmPriceFeed(vault.address, user1.address))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+
+    await expect(timelock.connect(user0).signalSetAmmPriceFeed(vault.address, user1.address))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    await timelock.connect(wallet).signalSetAmmPriceFeed(vault.address, user1.address)
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address))
+      .to.be.revertedWith("Timelock: action time not yet passed")
+
+    await increaseTime(provider, 4 * 24 * 60 * 60)
+    await mineBlock(provider)
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address))
+      .to.be.revertedWith("Timelock: action time not yet passed")
+
+    await increaseTime(provider, 1 * 24 * 60 * 60 + 10)
+    await mineBlock(provider)
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(user2.address, user1.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user2.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+
+    expect(await vault.ammPriceFeed()).eq(user3.address)
+    await timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address)
+    expect(await vault.ammPriceFeed()).eq(user1.address)
+
+    await timelock.connect(wallet).signalSetAmmPriceFeed(vault.address, user2.address)
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user2.address))
+      .to.be.revertedWith("Timelock: action time not yet passed")
+
+    const action0 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["setAmmPriceFeed", user1.address, user2.address])
+    const action1 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["setAmmPriceFeed", vault.address, user2.address])
+
+    await expect(timelock.connect(wallet).cancelAction(action0))
+      .to.be.revertedWith("Timelock: invalid _action")
+
+    await timelock.connect(wallet).cancelAction(action1)
+
+    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user2.address))
       .to.be.revertedWith("Timelock: action not signalled")
   })
 })

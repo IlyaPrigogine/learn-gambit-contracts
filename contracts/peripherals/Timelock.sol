@@ -20,6 +20,7 @@ contract Timelock {
     event SignalPendingAction(bytes32 action);
     event SignalApprove(address token, address spender, uint256 amount, bytes32 action);
     event SignalSetGov(address target, address gov, bytes32 action);
+    event SignalSetAmmPriceFeed(address target, address ammPriceFeed, bytes32 action);
     event ClearAction(bytes32 action);
 
     modifier onlyAdmin() {
@@ -78,6 +79,19 @@ contract Timelock {
         bytes32 action = keccak256(abi.encodePacked("setGov", _target, _gov));
         _validateAction(action);
         ITimelockTarget(_target).setGov(_gov);
+        _clearAction(action);
+    }
+
+    function signalSetAmmPriceFeed(address _vault, address _ammPriceFeed) external onlyAdmin {
+        bytes32 action = keccak256(abi.encodePacked("setAmmPriceFeed", _vault, _ammPriceFeed));
+        _setPendingAction(action);
+        emit SignalSetAmmPriceFeed(_vault, _ammPriceFeed, action);
+    }
+
+    function setAmmPriceFeed(address _vault, address _ammPriceFeed) external onlyAdmin {
+        bytes32 action = keccak256(abi.encodePacked("setAmmPriceFeed", _vault, _ammPriceFeed));
+        _validateAction(action);
+        IVault(_vault).setAmmPriceFeed(_ammPriceFeed);
         _clearAction(action);
     }
 

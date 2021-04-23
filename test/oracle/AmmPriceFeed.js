@@ -82,14 +82,37 @@ describe("AmmPriceFeed", function () {
         btcBnbPair.address
     ]])
 
-    ammPriceFeed = await deployContract("AmmPriceFeed", [[
+    ammPriceFeed = await deployContract("AmmPriceFeed", [])
+    await ammPriceFeed.initialize([
         vault.address,
         pancakeFactory.address,
         btc.address,
         eth.address,
         bnb.address,
         busd.address
-    ]])
+    ])
+  })
+
+  it("inits", async () => {
+    expect(await ammPriceFeed.isInitialized()).eq(true)
+    expect(await ammPriceFeed.vault()).eq(vault.address)
+    expect(await ammPriceFeed.factory()).eq(pancakeFactory.address)
+    expect(await ammPriceFeed.btc()).eq(btc.address)
+    expect(await ammPriceFeed.eth()).eq(eth.address)
+    expect(await ammPriceFeed.bnb()).eq(bnb.address)
+    expect(await ammPriceFeed.busd()).eq(busd.address)
+
+    await expect(ammPriceFeed.connect(wallet).initialize([]))
+      .to.be.revertedWith("AmmPriceFeed: already initialized")
+  })
+
+  it("setFactory", async () => {
+    await expect(ammPriceFeed.connect(user0).setFactory(user1.address))
+      .to.be.revertedWith("AmmPriceFeed: forbidden")
+
+    expect(await ammPriceFeed.factory()).eq(pancakeFactory.address)
+    await ammPriceFeed.setFactory(user1.address)
+    expect(await ammPriceFeed.factory()).eq(user1.address)
   })
 
   it("getPrice for bnb", async () => {

@@ -56,7 +56,7 @@ describe("Vault.buyUSDG", function () {
     await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
       .to.be.revertedWith("Vault: minting not enabled")
 
-    await expect(vault.buyUSDG(bnb.address, user1.address))
+    await expect(vault.buyUSDG(bnb.address, wallet.address))
       .to.be.revertedWith("Vault: _token not whitelisted")
 
     await vault.enableMinting()
@@ -99,15 +99,13 @@ describe("Vault.buyUSDG", function () {
     await bnb.transfer(vault.address, 100)
 
     expect(await usdg.balanceOf(wallet.address)).eq(0)
-    expect(await usdg.balanceOf(user1.address)).eq(0)
     expect(await vault.feeReserves(bnb.address)).eq(0)
     expect(await vault.usdgAmounts(bnb.address)).eq(0)
     expect(await vault.poolAmounts(bnb.address)).eq(0)
 
-    await vault.buyUSDG(bnb.address, user1.address)
+    await vault.buyUSDG(bnb.address, wallet.address)
 
-    expect(await usdg.balanceOf(wallet.address)).eq(0)
-    expect(await usdg.balanceOf(user1.address)).eq(29700)
+    expect(await usdg.balanceOf(wallet.address)).eq(29700)
     expect(await vault.feeReserves(bnb.address)).eq(1)
     expect(await vault.usdgAmounts(bnb.address)).eq(29700)
     expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)

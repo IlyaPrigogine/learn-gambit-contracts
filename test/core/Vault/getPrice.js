@@ -62,15 +62,17 @@ describe("Vault.getPrice", function () {
 
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
+
+    await vault.enableMinting()
   })
 
   it("getPrice", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
     await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
-    expect(await vault.getPrice(dai.address, true)).eq(expandDecimals(1, 30))
+    expect(await vault.getPrice(dai.address, true, false)).eq(expandDecimals(1, 30))
 
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1.1))
-    expect(await vault.getPrice(dai.address, true)).eq(expandDecimals(11, 29))
+    expect(await vault.getPrice(dai.address, true, false)).eq(expandDecimals(11, 29))
 
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(1))
     await vault.setTokenConfig(
@@ -85,23 +87,23 @@ describe("Vault.getPrice", function () {
       false // _isShortable
     )
 
-    expect(await vault.getPrice(usdc.address, true)).eq(expandDecimals(1, 30))
+    expect(await vault.getPrice(usdc.address, true, false)).eq(expandDecimals(1, 30))
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(1.1))
-    expect(await vault.getPrice(usdc.address, true)).eq(expandDecimals(11, 29))
+    expect(await vault.getPrice(usdc.address, true, false)).eq(expandDecimals(11, 29))
 
     await vault.setMaxStrictPriceDeviation(expandDecimals(1, 29))
-    expect(await vault.getPrice(usdc.address, true)).eq(expandDecimals(1, 30))
+    expect(await vault.getPrice(usdc.address, true, false)).eq(expandDecimals(1, 30))
 
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(1.11))
-    expect(await vault.getPrice(usdc.address, true)).eq(expandDecimals(111, 28))
+    expect(await vault.getPrice(usdc.address, true, false)).eq(expandDecimals(111, 28))
 
-    expect(await vault.getPrice(usdc.address, false)).eq(expandDecimals(1, 30))
+    expect(await vault.getPrice(usdc.address, false, false)).eq(expandDecimals(1, 30))
 
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(0.9))
-    expect(await vault.getPrice(usdc.address, false)).eq(expandDecimals(1, 30))
+    expect(await vault.getPrice(usdc.address, false, false)).eq(expandDecimals(1, 30))
 
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(0.89))
-    expect(await vault.getPrice(usdc.address, false)).eq(expandDecimals(89, 28))
+    expect(await vault.getPrice(usdc.address, false, false)).eq(expandDecimals(89, 28))
   })
 
   it("includes AMM price", async () => {
@@ -140,33 +142,34 @@ describe("Vault.getPrice", function () {
         btcBnbPair.address
     ]])
 
-    const ammPriceFeed = await deployContract("AmmPriceFeed", [[
+    const ammPriceFeed = await deployContract("AmmPriceFeed", [])
+    await ammPriceFeed.initialize([
         vault.address,
         pancakeFactory.address,
         btc.address,
         eth.address,
         bnb.address,
         busd.address
-    ]])
+    ])
 
-    expect(await vault.getPrice(bnb.address, false)).eq(toNormalizedPrice(600))
-    expect(await vault.getPrice(btc.address, false)).eq(toNormalizedPrice(80000))
+    expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(600))
+    expect(await vault.getPrice(btc.address, false, false)).eq(toNormalizedPrice(80000))
 
     await vault.setAmmPriceFeed(ammPriceFeed.address)
 
-    expect(await vault.getPrice(bnb.address, false)).eq(toNormalizedPrice(300))
-    expect(await vault.getPrice(btc.address, false)).eq(toNormalizedPrice(60000))
+    expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(300))
+    expect(await vault.getPrice(btc.address, false, false)).eq(toNormalizedPrice(60000))
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(200))
-    expect(await vault.getPrice(bnb.address, false)).eq(toNormalizedPrice(200))
+    expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(200))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
-    expect(await vault.getPrice(btc.address, false)).eq(toNormalizedPrice(50000))
+    expect(await vault.getPrice(btc.address, false, false)).eq(toNormalizedPrice(50000))
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(250))
-    expect(await vault.getPrice(bnb.address, false)).eq(toNormalizedPrice(200))
+    expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(200))
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(280))
-    expect(await vault.getPrice(bnb.address, true)).eq(toNormalizedPrice(300))
+    expect(await vault.getPrice(bnb.address, true, false)).eq(toNormalizedPrice(300))
   })
 })

@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getEthConfig, getDaiConfig } = require("./helpers")
 
 use(solidity)
 
@@ -18,6 +18,8 @@ describe("Vault.swap", function () {
   let bnbPriceFeed
   let btc
   let btcPriceFeed
+  let eth
+  let ethPriceFeed
   let dai
   let daiPriceFeed
   let distributor0
@@ -29,6 +31,9 @@ describe("Vault.swap", function () {
 
     btc = await deployContract("Token", [])
     btcPriceFeed = await deployContract("PriceFeed", [])
+
+    eth = await deployContract("Token", [])
+    ethPriceFeed = await deployContract("PriceFeed", [])
 
     dai = await deployContract("Token", [])
     daiPriceFeed = await deployContract("PriceFeed", [])
@@ -130,5 +135,66 @@ describe("Vault.swap", function () {
     await usdg.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
     await expect(vault.sellUSDG(btc.address, user3.address))
       .to.be.revertedWith("Vault: poolAmount exceeded")
+  })
+
+  it("caps max USDG amount", async () => {
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(600))
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
+
+    await ethPriceFeed.setLatestAnswer(toChainlinkPrice(3000))
+    await vault.setTokenConfig(...getEthConfig(eth, ethPriceFeed))
+
+    await bnb.mint(user0.address, expandDecimals(499, 18))
+    await bnb.connect(user0).transfer(vault.address, expandDecimals(499, 18))
+    await vault.connect(user0).buyUSDG(bnb.address, user0.address)
+
+    await eth.mint(user0.address, expandDecimals(10, 18))
+    await eth.connect(user0).transfer(vault.address, expandDecimals(10, 18))
+    await vault.connect(user0).buyUSDG(eth.address, user1.address)
+
+    await bnb.mint(user0.address, expandDecimals(1, 18))
+    await bnb.connect(user0).transfer(vault.address, expandDecimals(1, 18))
+    await vault.connect(user0).swap(bnb.address, eth.address, user1.address)
+
+    await bnb.mint(user0.address, expandDecimals(2, 18))
+    await bnb.connect(user0).transfer(vault.address, expandDecimals(2, 18))
+    await expect(vault.connect(user0).swap(bnb.address, eth.address, user1.address))
+      .to.be.revertedWith("Vault: max USDG exceeded")
+  })
+
+  it("caps max USDG debt", async () => {
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(600))
+    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
+
+    await ethPriceFeed.setLatestAnswer(toChainlinkPrice(3000))
+    await vault.setTokenConfig(...getEthConfig(eth, ethPriceFeed))
+
+    await bnb.mint(user0.address, expandDecimals(100, 18))
+    await bnb.connect(user0).transfer(vault.address, expandDecimals(100, 18))
+    await vault.connect(user0).buyUSDG(bnb.address, user0.address)
+
+    await eth.mint(user0.address, expandDecimals(10, 18))
+
+    expect(await eth.balanceOf(user0.address)).eq(expandDecimals(10, 18))
+    expect(await bnb.balanceOf(user1.address)).eq(0)
+
+    await eth.connect(user0).transfer(vault.address, expandDecimals(10, 18))
+    await vault.connect(user0).swap(eth.address, bnb.address, user1.address)
+
+    expect(await eth.balanceOf(user0.address)).eq(0)
+    expect(await bnb.balanceOf(user1.address)).eq("49850000000000000000")
+
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
+
+    await eth.mint(user0.address, expandDecimals(1, 18))
+    await eth.connect(user0).transfer(vault.address, expandDecimals(1, 18))
+    await expect(vault.connect(user0).swap(eth.address, bnb.address, user1.address))
+      .to.be.revertedWith("Vault: max debt exceeded")
+
+    await bnb.mint(user0.address, expandDecimals(1, 18))
+    await bnb.connect(user0).transfer(vault.address, expandDecimals(1, 18))
+    await vault.connect(user0).swap(bnb.address, eth.address, user1.address)
   })
 })
