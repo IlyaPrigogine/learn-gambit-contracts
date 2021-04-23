@@ -160,6 +160,18 @@ describe("Vault.getPrice", function () {
     expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(300))
     expect(await vault.getPrice(btc.address, false, false)).eq(toNormalizedPrice(60000))
 
+    await expect(ammPriceFeed.connect(user0).setIsEnabled(false))
+      .to.be.revertedWith("AmmPriceFeed: forbidden")
+
+    await expect(await ammPriceFeed.isEnabled()).eq(true)
+    await ammPriceFeed.connect(wallet).setIsEnabled(false)
+    await expect(await ammPriceFeed.isEnabled()).eq(false)
+
+    expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(600))
+    expect(await vault.getPrice(btc.address, false, false)).eq(toNormalizedPrice(80000))
+
+    await ammPriceFeed.connect(wallet).setIsEnabled(true)
+
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(200))
     expect(await vault.getPrice(bnb.address, false, false)).eq(toNormalizedPrice(200))
 

@@ -17,6 +17,7 @@ contract AmmPriceFeed is IAmmPriceFeed {
 
     address public gov;
     bool public isInitialized;
+    bool public isEnabled = true;
 
     address public vault;
     address public factory;
@@ -52,7 +53,15 @@ contract AmmPriceFeed is IAmmPriceFeed {
         factory = _factory;
     }
 
+    function setIsEnabled(bool _isEnabled) external onlyGov {
+        isEnabled = _isEnabled;
+    }
+
     function getPrice(address _token) external override view returns (uint256) {
+        if (!isEnabled) {
+            return 0;
+        }
+
         if (_token == btc) {
             return getPriceFromPath(busd, bnb, btc);
         }
