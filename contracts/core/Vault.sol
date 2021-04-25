@@ -7,11 +7,9 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/token/SafeERC20.sol";
 import "../libraries/utils/ReentrancyGuard.sol";
 
-import "../oracle/interfaces/IPriceFeed.sol";
-import "../oracle/interfaces/IAmmPriceFeed.sol";
-
 import "../tokens/interfaces/IUSDG.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/IVaultPriceFeed.sol";
 
 contract Vault is ReentrancyGuard, IVault {
     using SafeMath for uint256;
@@ -29,7 +27,6 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
     uint256 public constant FUNDING_RATE_PRECISION = 1000000;
     uint256 public constant PRICE_PRECISION = 10 ** 30;
-    uint256 public constant ONE_USD = PRICE_PRECISION;
     uint256 public constant MIN_LEVERAGE = 10000; // 1x
     uint256 public constant USDG_DECIMALS = 18;
     uint256 public constant MAX_FEE_BASIS_POINTS = 500; // 5%
@@ -41,7 +38,7 @@ contract Vault is ReentrancyGuard, IVault {
     bool public isMintingEnabled = false;
 
     address public router;
-    address public ammPriceFeed;
+    address public override priceFeed;
 
     address public usdg;
     address public gov;
@@ -51,7 +48,6 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public whitelistedTokenCount;
 
     uint256 public maxLeverage = 50 * 10000; // 50x
-    uint256 public priceSampleSpace = 3;
 
     uint256 public liquidationFeeUsd;
     uint256 public swapFeeBasisPoints = 30; // 0.3%
@@ -65,24 +61,14 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public maxDebtBasisPoints;
 
     bool public includeAmmPrice = true;
-    uint256 public maxStrictPriceDeviation = 0;
 
     mapping (address => mapping (address => bool)) public approvedRouters;
 
     mapping (address => bool) public whitelistedTokens;
-    mapping (address => address) public priceFeeds;
-    mapping (address => uint256) public priceDecimals;
     mapping (address => uint256) public override tokenDecimals;
     mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public minProfitBasisPoints;
     mapping (address => bool) public stableTokens;
-    // Chainlink can return prices for stablecoins
-    // that differs from 1 USD by a larger percentage than stableSwapFeeBasisPoints
-    // we use strictStableTokens to cap the price to 1 USD
-    // this allows us to configure stablecoins like DAI as being a stableToken
-    // while not being a strictStableToken
-    mapping (address => bool) public strictStableTokens;
-
     mapping (address => bool) public shortableTokens;
 
     // tokenBalances is used only to determine _transferIn values
@@ -223,14 +209,9 @@ contract Vault is ReentrancyGuard, IVault {
         gov = _gov;
     }
 
-    function setMaxStrictPriceDeviation(uint256 _maxStrictPriceDeviation) external override {
+    function setPriceFeed(address _priceFeed) external override {
         _onlyGov();
-        maxStrictPriceDeviation = _maxStrictPriceDeviation;
-    }
-
-    function setAmmPriceFeed(address _ammPriceFeed) external override {
-        _onlyGov();
-        ammPriceFeed = _ammPriceFeed;
+        priceFeed = _priceFeed;
     }
 
     function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external override {
@@ -243,12 +224,6 @@ contract Vault is ReentrancyGuard, IVault {
         _onlyGov();
         require(_maxLeverage > MIN_LEVERAGE, "Vault: invalid _maxLeverage");
         maxLeverage = _maxLeverage;
-    }
-
-    function setPriceSampleSpace(uint256 _priceSampleSpace) external override {
-        _onlyGov();
-        require(_priceSampleSpace > 0, "Vault: invalid _priceSampleSpace");
-        priceSampleSpace = _priceSampleSpace;
     }
 
     function setMaxGasPrice(uint256 _maxGasPrice) external override {
@@ -290,13 +265,10 @@ contract Vault is ReentrancyGuard, IVault {
 
     function setTokenConfig(
         address _token,
-        address _priceFeed,
-        uint256 _priceDecimals,
         uint256 _tokenDecimals,
         uint256 _redemptionBps,
         uint256 _minProfitBps,
         bool _isStable,
-        bool _isStrictStable,
         bool _isShortable
     ) external {
         _onlyGov();
@@ -305,13 +277,10 @@ contract Vault is ReentrancyGuard, IVault {
             whitelistedTokenCount = whitelistedTokenCount.add(1);
         }
         whitelistedTokens[_token] = true;
-        priceFeeds[_token] = _priceFeed;
-        priceDecimals[_token] = _priceDecimals;
         tokenDecimals[_token] = _tokenDecimals;
         redemptionBasisPoints[_token] = _redemptionBps;
         minProfitBasisPoints[_token] = _minProfitBps;
         stableTokens[_token] = _isStable;
-        strictStableTokens[_token] = _isStrictStable;
         shortableTokens[_token] = _isShortable;
 
         // validate price feed
@@ -322,13 +291,10 @@ contract Vault is ReentrancyGuard, IVault {
         _onlyGov();
         require(whitelistedTokens[_token], "Vault: token not whitelisted");
         delete whitelistedTokens[_token];
-        delete priceFeeds[_token];
-        delete priceDecimals[_token];
         delete tokenDecimals[_token];
         delete redemptionBasisPoints[_token];
         delete minProfitBasisPoints[_token];
         delete stableTokens[_token];
-        delete strictStableTokens[_token];
         delete shortableTokens[_token];
         whitelistedTokenCount = whitelistedTokenCount.sub(1);
     }
@@ -657,69 +623,11 @@ contract Vault is ReentrancyGuard, IVault {
     }
 
     function getMaxPrice(address _token) public override view returns (uint256) {
-        return getPrice(_token, true, false);
+        return IVaultPriceFeed(priceFeed).getPrice(_token, true, includeAmmPrice);
     }
 
     function getMinPrice(address _token) public override view returns (uint256) {
-        return getPrice(_token, false, false);
-    }
-
-    function getPrice(address _token, bool _maximise, bool _excludeAmmPrice) public override view returns (uint256) {
-        address priceFeedAddress = priceFeeds[_token];
-        require(priceFeedAddress != address(0), "Vault: invalid price feed");
-        IPriceFeed priceFeed = IPriceFeed(priceFeedAddress);
-
-        uint256 price = 0;
-        uint80 roundId = priceFeed.latestRound();
-
-        for (uint80 i = 0; i < priceSampleSpace; i++) {
-            if (roundId <= i) { break; }
-            (, int256 p, , ,) = priceFeed.getRoundData(roundId - i);
-            require(p > 0, "Vault: invalid price");
-
-            if (price == 0) {
-                price = uint256(p);
-                continue;
-            }
-
-            if (_maximise && uint256(p) > price) {
-                price = uint256(p);
-            }
-
-            if (!_maximise && uint256(p) < price) {
-                price = uint256(p);
-            }
-        }
-
-        require(price > 0, "Vault: could not fetch price");
-        // normalise price precision
-        price = price.mul(PRICE_PRECISION).div(getPricePrecision(_token));
-
-        if (!_excludeAmmPrice && includeAmmPrice && ammPriceFeed != address(0)) {
-            uint256 ammPrice = IAmmPriceFeed(ammPriceFeed).getPrice(_token);
-            if (ammPrice > 0) {
-                if (_maximise && ammPrice > price) {
-                    price = ammPrice;
-                }
-                if (!_maximise && ammPrice < price) {
-                    price = ammPrice;
-                }
-            }
-        }
-
-        if (strictStableTokens[_token]) {
-            uint256 delta = price > ONE_USD ? price.sub(ONE_USD) : ONE_USD.sub(price);
-            if (delta <= maxStrictPriceDeviation) {
-                return ONE_USD;
-            }
-        }
-
-        return price;
-    }
-
-    function getPricePrecision(address _token) public view returns (uint256) {
-        uint256 decimals = priceDecimals[_token];
-        return 10 ** decimals;
+        return IVaultPriceFeed(priceFeed).getPrice(_token, false, includeAmmPrice);
     }
 
     function getRedemptionAmount(address _token, uint256 _usdgAmount) public override view returns (uint256) {

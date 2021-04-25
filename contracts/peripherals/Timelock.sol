@@ -4,6 +4,7 @@ pragma solidity 0.6.12;
 
 import "./interfaces/ITimelockTarget.sol";
 import "../core/interfaces/IVault.sol";
+import "../core/interfaces/IVaultPriceFeed.sol";
 
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
@@ -20,7 +21,7 @@ contract Timelock {
     event SignalPendingAction(bytes32 action);
     event SignalApprove(address token, address spender, uint256 amount, bytes32 action);
     event SignalSetGov(address target, address gov, bytes32 action);
-    event SignalSetAmmPriceFeed(address target, address ammPriceFeed, bytes32 action);
+    event SignalSetPriceFeed(address target, address priceFeed, bytes32 action);
     event ClearAction(bytes32 action);
 
     modifier onlyAdmin() {
@@ -36,16 +37,16 @@ contract Timelock {
         IVault(_vault).enableMinting();
     }
 
-    function setMaxStrictPriceDeviation(address _vault, uint256 _maxStrictPriceDeviation) external onlyAdmin {
-        IVault(_vault).setMaxStrictPriceDeviation(_maxStrictPriceDeviation);
+    function setMaxStrictPriceDeviation(address _priceFeed, uint256 _maxStrictPriceDeviation) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setMaxStrictPriceDeviation(_maxStrictPriceDeviation);
+    }
+
+    function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);
     }
 
     function setMaxUsdg(address _vault,uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external onlyAdmin {
         IVault(_vault).setMaxUsdg(_maxUsdgBatchSize, _maxUsdgBuffer);
-    }
-
-    function setPriceSampleSpace(address _vault,uint256 _priceSampleSpace) external onlyAdmin {
-        IVault(_vault).setPriceSampleSpace(_priceSampleSpace);
     }
 
     function setMaxGasPrice(address _vault,uint256 _maxGasPrice) external onlyAdmin {
@@ -82,16 +83,16 @@ contract Timelock {
         _clearAction(action);
     }
 
-    function signalSetAmmPriceFeed(address _vault, address _ammPriceFeed) external onlyAdmin {
-        bytes32 action = keccak256(abi.encodePacked("setAmmPriceFeed", _vault, _ammPriceFeed));
+    function signalSetPriceFeed(address _vault, address _priceFeed) external onlyAdmin {
+        bytes32 action = keccak256(abi.encodePacked("setPriceFeed", _vault, _priceFeed));
         _setPendingAction(action);
-        emit SignalSetAmmPriceFeed(_vault, _ammPriceFeed, action);
+        emit SignalSetPriceFeed(_vault, _priceFeed, action);
     }
 
-    function setAmmPriceFeed(address _vault, address _ammPriceFeed) external onlyAdmin {
-        bytes32 action = keccak256(abi.encodePacked("setAmmPriceFeed", _vault, _ammPriceFeed));
+    function setPriceFeed(address _vault, address _priceFeed) external onlyAdmin {
+        bytes32 action = keccak256(abi.encodePacked("setPriceFeed", _vault, _priceFeed));
         _validateAction(action);
-        IVault(_vault).setAmmPriceFeed(_ammPriceFeed);
+        IVault(_vault).setPriceFeed(_priceFeed);
         _clearAction(action);
     }
 

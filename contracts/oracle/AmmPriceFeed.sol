@@ -49,6 +49,10 @@ contract AmmPriceFeed is IAmmPriceFeed {
         busd = _addresses[5];
     }
 
+    function setGov(address _gov) external onlyGov {
+        gov = _gov;
+    }
+
     function setFactory(address _factory) external onlyGov {
         factory = _factory;
     }

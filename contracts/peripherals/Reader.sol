@@ -6,6 +6,7 @@ import "../libraries/token/IERC20.sol";
 import "../libraries/math/SafeMath.sol";
 
 import "../core/interfaces/IVault.sol";
+import "../core/interfaces/IVaultPriceFeed.sol";
 import "../tokens/interfaces/IYieldTracker.sol";
 import "../amm/interfaces/IPancakeFactory.sol";
 
@@ -97,7 +98,10 @@ contract Reader {
 
     function getVaultTokenInfo(address _vault, address _weth, uint256 _usdgAmount, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256 propsLength = 9;
+
         IVault vault = IVault(_vault);
+        IVaultPriceFeed priceFeed = IVaultPriceFeed(vault.priceFeed());
+
         uint256[] memory amounts = new uint256[](_tokens.length * propsLength);
         for (uint256 i = 0; i < _tokens.length; i++) {
             address token = _tokens[i];
@@ -111,8 +115,8 @@ contract Reader {
             amounts[i * propsLength + 4] = vault.getMinPrice(token);
             amounts[i * propsLength + 5] = vault.getMaxPrice(token);
             amounts[i * propsLength + 6] = vault.guaranteedUsd(token);
-            amounts[i * propsLength + 7] = vault.getPrice(token, false, true);
-            amounts[i * propsLength + 8] = vault.getPrice(token, true, true);
+            amounts[i * propsLength + 7] = priceFeed.getPrice(token, false, true);
+            amounts[i * propsLength + 8] = priceFeed.getPrice(token, true, true);
         }
 
         return amounts;
