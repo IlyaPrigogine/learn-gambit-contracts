@@ -178,6 +178,7 @@ contract Vault is ReentrancyGuard, IVault {
     function initialize(
         address _router,
         address _usdg,
+        address _priceFeed,
         uint256 _maxUsdgBatchSize,
         uint256 _maxUsdgBuffer,
         uint256 _liquidationFeeUsd,
@@ -191,6 +192,7 @@ contract Vault is ReentrancyGuard, IVault {
 
         router = _router;
         usdg = _usdg;
+        priceFeed = _priceFeed;
         maxUsdgBatchSize = _maxUsdgBatchSize;
         maxUsdgBuffer = _maxUsdgBuffer;
         liquidationFeeUsd = _liquidationFeeUsd;

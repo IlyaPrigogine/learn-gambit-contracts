@@ -12,6 +12,7 @@ describe("Timelock", function () {
   const provider = waffle.provider
   const [wallet, user0, user1, user2, user3] = provider.getWallets()
   let vault
+  let vaultPriceFeed
   let usdg
   let router
   let bnb
@@ -37,8 +38,9 @@ describe("Timelock", function () {
     vault = await deployContract("Vault", [])
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
+    vaultPriceFeed = await deployContract("VaultPriceFeed", [])
 
-    await initVault(vault, router, usdg)
+    await initVault(vault, router, usdg, vaultPriceFeed)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -49,10 +51,16 @@ describe("Timelock", function () {
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
 
-    await vault.setAmmPriceFeed(user3.address)
+    await vault.setPriceFeed(user3.address)
 
     timelock = await deployContract("Timelock", [])
     await vault.setGov(timelock.address)
+
+    await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(dai.address, daiPriceFeed.address, 8, false)
+
+    await vaultPriceFeed.setGov(timelock.address)
   })
 
   it("inits", async () => {
@@ -72,6 +80,33 @@ describe("Timelock", function () {
     expect(await vault.isMintingEnabled()).eq(false)
   })
 
+  it("setIsAmmEnabled", async () => {
+    await expect(timelock.connect(user0).setIsAmmEnabled(vaultPriceFeed.address, false))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    expect(await vaultPriceFeed.isAmmEnabled()).eq(true)
+    await timelock.connect(wallet).setIsAmmEnabled(vaultPriceFeed.address, false)
+    expect(await vaultPriceFeed.isAmmEnabled()).eq(false)
+  })
+
+  it("setMaxStrictPriceDeviation", async () => {
+    await expect(timelock.connect(user0).setMaxStrictPriceDeviation(vaultPriceFeed.address, 100))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    expect(await vaultPriceFeed.maxStrictPriceDeviation()).eq(0)
+    await timelock.connect(wallet).setMaxStrictPriceDeviation(vaultPriceFeed.address, 100)
+    expect(await vaultPriceFeed.maxStrictPriceDeviation()).eq(100)
+  })
+
+  it("setPriceSampleSpace", async () => {
+    await expect(timelock.connect(user0).setPriceSampleSpace(vaultPriceFeed.address, 0))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    expect(await vaultPriceFeed.priceSampleSpace()).eq(3)
+    await timelock.connect(wallet).setPriceSampleSpace(vaultPriceFeed.address, 1)
+    expect(await vaultPriceFeed.priceSampleSpace()).eq(1)
+  })
+
   it("enableMinting", async () => {
     await expect(timelock.connect(user0).enableMinting(vault.address))
       .to.be.revertedWith("Timelock: forbidden")
@@ -79,15 +114,6 @@ describe("Timelock", function () {
     expect(await vault.isMintingEnabled()).eq(false)
     await timelock.connect(wallet).enableMinting(vault.address)
     expect(await vault.isMintingEnabled()).eq(true)
-  })
-
-  it("setMaxStrictPriceDeviation", async () => {
-    await expect(timelock.connect(user0).setMaxStrictPriceDeviation(vault.address, 100))
-      .to.be.revertedWith("Timelock: forbidden")
-
-    expect(await vault.maxStrictPriceDeviation()).eq(0)
-    await timelock.connect(wallet).setMaxStrictPriceDeviation(vault.address, 100)
-    expect(await vault.maxStrictPriceDeviation()).eq(100)
   })
 
   it("setMaxUsdg", async () => {
@@ -99,15 +125,6 @@ describe("Timelock", function () {
     await timelock.connect(wallet).setMaxUsdg(vault.address, 500, 1000)
     expect(await vault.maxUsdgBatchSize()).eq(500)
     expect(await vault.maxUsdgBuffer()).eq(1000)
-  })
-
-  it("setPriceSampleSpace", async () => {
-    await expect(timelock.connect(user0).setPriceSampleSpace(vault.address, 0))
-      .to.be.revertedWith("Timelock: forbidden")
-
-    expect(await vault.priceSampleSpace()).eq(3)
-    await timelock.connect(wallet).setPriceSampleSpace(vault.address, 1)
-    expect(await vault.priceSampleSpace()).eq(1)
   })
 
   it("setMaxGasPrice", async () => {
@@ -240,54 +257,54 @@ describe("Timelock", function () {
       .to.be.revertedWith("Timelock: action not signalled")
   })
 
-  it("setAmmPriceFeed", async () => {
-    await expect(timelock.connect(user0).setAmmPriceFeed(vault.address, user1.address))
+  it("setPriceFeed", async () => {
+    await expect(timelock.connect(user0).setPriceFeed(vault.address, user1.address))
       .to.be.revertedWith("Timelock: forbidden")
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address))
+    await expect(timelock.connect(wallet).setPriceFeed(vault.address, user1.address))
       .to.be.revertedWith("Timelock: action not signalled")
 
-    await expect(timelock.connect(user0).signalSetAmmPriceFeed(vault.address, user1.address))
+    await expect(timelock.connect(user0).signalSetPriceFeed(vault.address, user1.address))
       .to.be.revertedWith("Timelock: forbidden")
 
-    await timelock.connect(wallet).signalSetAmmPriceFeed(vault.address, user1.address)
+    await timelock.connect(wallet).signalSetPriceFeed(vault.address, user1.address)
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address))
+    await expect(timelock.connect(wallet).setPriceFeed(vault.address, user1.address))
       .to.be.revertedWith("Timelock: action time not yet passed")
 
     await increaseTime(provider, 4 * 24 * 60 * 60)
     await mineBlock(provider)
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address))
+    await expect(timelock.connect(wallet).setPriceFeed(vault.address, user1.address))
       .to.be.revertedWith("Timelock: action time not yet passed")
 
     await increaseTime(provider, 1 * 24 * 60 * 60 + 10)
     await mineBlock(provider)
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(user2.address, user1.address))
+    await expect(timelock.connect(wallet).setPriceFeed(user2.address, user1.address))
       .to.be.revertedWith("Timelock: action not signalled")
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user2.address))
+    await expect(timelock.connect(wallet).setPriceFeed(vault.address, user2.address))
       .to.be.revertedWith("Timelock: action not signalled")
 
-    expect(await vault.ammPriceFeed()).eq(user3.address)
-    await timelock.connect(wallet).setAmmPriceFeed(vault.address, user1.address)
-    expect(await vault.ammPriceFeed()).eq(user1.address)
+    expect(await vault.priceFeed()).eq(user3.address)
+    await timelock.connect(wallet).setPriceFeed(vault.address, user1.address)
+    expect(await vault.priceFeed()).eq(user1.address)
 
-    await timelock.connect(wallet).signalSetAmmPriceFeed(vault.address, user2.address)
+    await timelock.connect(wallet).signalSetPriceFeed(vault.address, user2.address)
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user2.address))
+    await expect(timelock.connect(wallet).setPriceFeed(vault.address, user2.address))
       .to.be.revertedWith("Timelock: action time not yet passed")
 
-    const action0 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["setAmmPriceFeed", user1.address, user2.address])
-    const action1 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["setAmmPriceFeed", vault.address, user2.address])
+    const action0 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["setPriceFeed", user1.address, user2.address])
+    const action1 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["setPriceFeed", vault.address, user2.address])
 
     await expect(timelock.connect(wallet).cancelAction(action0))
       .to.be.revertedWith("Timelock: invalid _action")
 
     await timelock.connect(wallet).cancelAction(action1)
 
-    await expect(timelock.connect(wallet).setAmmPriceFeed(vault.address, user2.address))
+    await expect(timelock.connect(wallet).setPriceFeed(vault.address, user2.address))
       .to.be.revertedWith("Timelock: action not signalled")
   })
 })

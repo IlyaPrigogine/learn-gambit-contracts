@@ -12,6 +12,7 @@ describe("Vault.swap", function () {
   const provider = waffle.provider
   const [wallet, user0, user1, user2, user3] = provider.getWallets()
   let vault
+  let vaultPriceFeed
   let usdg
   let router
   let bnb
@@ -41,8 +42,9 @@ describe("Vault.swap", function () {
     vault = await deployContract("Vault", [])
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
+    vaultPriceFeed = await deployContract("VaultPriceFeed", [])
 
-    await initVault(vault, router, usdg)
+    await initVault(vault, router, usdg, vaultPriceFeed)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -54,6 +56,11 @@ describe("Vault.swap", function () {
     await usdg.setYieldTrackers([yieldTracker0.address])
 
     await vault.enableMinting()
+
+    await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(eth.address, ethPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(dai.address, daiPriceFeed.address, 8, false)
   })
 
   it("swap", async () => {

@@ -33,8 +33,8 @@ contract Timelock {
         admin = msg.sender;
     }
 
-    function enableMinting(address _vault) external onlyAdmin {
-        IVault(_vault).enableMinting();
+    function setIsAmmEnabled(address _priceFeed, bool _isEnabled) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setIsAmmEnabled(_isEnabled);
     }
 
     function setMaxStrictPriceDeviation(address _priceFeed, uint256 _maxStrictPriceDeviation) external onlyAdmin {
@@ -43,6 +43,10 @@ contract Timelock {
 
     function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {
         IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);
+    }
+
+    function enableMinting(address _vault) external onlyAdmin {
+        IVault(_vault).enableMinting();
     }
 
     function setMaxUsdg(address _vault,uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external onlyAdmin {

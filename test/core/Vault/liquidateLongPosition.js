@@ -12,6 +12,7 @@ describe("Vault.liquidateLongPosition", function () {
   const provider = waffle.provider
   const [wallet, user0, user1, user2, user3] = provider.getWallets()
   let vault
+  let vaultPriceFeed
   let usdg
   let router
   let bnb
@@ -46,8 +47,9 @@ describe("Vault.liquidateLongPosition", function () {
     vault = await deployContract("Vault", [])
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
+    vaultPriceFeed = await deployContract("VaultPriceFeed", [])
 
-    await initVault(vault, router, usdg)
+    await initVault(vault, router, usdg, vaultPriceFeed)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -59,6 +61,10 @@ describe("Vault.liquidateLongPosition", function () {
     await usdg.setYieldTrackers([yieldTracker0.address])
 
     await vault.enableMinting()
+
+    await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(dai.address, daiPriceFeed.address, 8, false)
   })
 
   it("liquidate long", async () => {
@@ -156,47 +162,17 @@ describe("Vault.liquidateLongPosition", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(600))
     await busdPriceFeed.setLatestAnswer(toChainlinkPrice(1))
 
-    await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
-    await vault.setTokenConfig(
-        busd.address, // _token
-        busdPriceFeed.address, // _priceFeed
-        8, // _priceDecimals
-        18, // _tokenDecimals
-        9000, // _redemptionBps
-        75, // _minProfitBps
-        true, // _isStable
-        true, // _isStrictStable
-        false // _isShortable
-    )
+    const bnbBusd = await deployContract("PancakePair", [])
+    await bnbBusd.setReserves(expandDecimals(1000, 18), expandDecimals(1000 * 1000, 18))
 
-    const bnbBusdPair = newWallet()
-    const btcBnbPair = newWallet()
+    const ethBnb = await deployContract("PancakePair", [])
+    await ethBnb.setReserves(expandDecimals(800, 18), expandDecimals(100, 18))
 
-    await bnb.mint(bnbBusdPair.address, expandDecimals(1 * 1000, 18))
-    await busd.mint(bnbBusdPair.address, expandDecimals(1000 * 1000, 18))
+    const btcBnb = await deployContract("PancakePair", [])
+    await btcBnb.setReserves(expandDecimals(25, 18), expandDecimals(1000, 18))
 
-    await btc.mint(btcBnbPair.address, expandDecimals(25, 8))
-    await bnb.mint(btcBnbPair.address, expandDecimals(1000, 18))
-
-    const pancakeFactory = await deployContract("PancakeFactory", [[
-        btc.address,
-        bnb.address,
-        busd.address,
-        bnbBusdPair.address,
-        btcBnbPair.address
-    ]])
-
-    const ammPriceFeed = await deployContract("AmmPriceFeed", [])
-    await ammPriceFeed.initialize([
-        vault.address,
-        pancakeFactory.address,
-        btc.address,
-        eth.address,
-        bnb.address,
-        busd.address
-    ])
-
-    await vault.setAmmPriceFeed(ammPriceFeed.address)
+    await vaultPriceFeed.setTokens(btc.address, eth.address, bnb.address)
+    await vaultPriceFeed.setPairs(bnbBusd.address, ethBnb.address, btcBnb.address)
 
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
     await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
@@ -233,7 +209,7 @@ describe("Vault.liquidateLongPosition", function () {
     expect(delta[1]).eq("2195121951219512195121951219512") // ~2.195
     expect((await vault.validateLiquidation(user0.address, btc.address, btc.address, true, false))[0]).eq(false)
 
-    await btc.mint(btcBnbPair.address, expandDecimals(1, 8))
+    await btcBnb.setReserves(expandDecimals(26, 18), expandDecimals(1000, 18))
     delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
     expect(delta[0]).eq(false)
     expect(delta[1]).eq("5572232645403377110694183864916") // ~5.572

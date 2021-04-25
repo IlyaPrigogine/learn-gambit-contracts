@@ -1,10 +1,11 @@
 const { expandDecimals } = require("../../shared/utilities")
 const { toUsd } = require("../../shared/units")
 
-async function initVault(vault, router, usdg) {
+async function initVault(vault, router, usdg, priceFeed) {
     await vault.initialize(
       router.address, // router
       usdg.address, // usdg
+      priceFeed.address, // priceFeed
       expandDecimals(600 * 1000, 18), // maxUsdgBatchSize
       expandDecimals(100 * 1000, 18), // maxUsdgBuffer
       toUsd(5), // liquidationFeeUsd
@@ -17,13 +18,10 @@ async function initVault(vault, router, usdg) {
 function getBnbConfig(bnb, bnbPriceFeed) {
   return [
     bnb.address, // _token
-    bnbPriceFeed.address, // _priceFeed
-    8, // _priceDecimals
     18, // _tokenDecimals
     9000, // _redemptionBps
     75, // _minProfitBps
     false, // _isStable
-    false, // _isStrictStable
     true // _isShortable
   ]
 }
@@ -31,13 +29,10 @@ function getBnbConfig(bnb, bnbPriceFeed) {
 function getEthConfig(eth, ethPriceFeed) {
   return [
     eth.address, // _token
-    ethPriceFeed.address, // _priceFeed
-    8, // _priceDecimals
     18, // _tokenDecimals
     9000, // _redemptionBps
     75, // _minProfitBps
     false, // _isStable
-    false, // _isStrictStable
     true // _isShortable
   ]
 }
@@ -45,13 +40,10 @@ function getEthConfig(eth, ethPriceFeed) {
 function getBtcConfig(btc, btcPriceFeed) {
   return [
     btc.address, // _token
-    btcPriceFeed.address, // _priceFeed
-    8, // _priceDecimals
     8, // _tokenDecimals
     9000, // _redemptionBps
     75, // _minProfitBps
     false, // _isStable
-    false, // _isStrictStable
     true // _isShortable
   ]
 }
@@ -59,13 +51,10 @@ function getBtcConfig(btc, btcPriceFeed) {
 function getDaiConfig(dai, daiPriceFeed) {
   return [
     dai.address, // _token
-    daiPriceFeed.address, // _priceFeed
-    8, // _priceDecimals
     18, // _tokenDecimals
     9000, // _redemptionBps
     75, // _minProfitBps
     true, // _isStable
-    false, // _isStrictStable
     false // _isShortable
   ]
 }

@@ -28,11 +28,11 @@ async function main() {
   await sendTxn(vault.initialize(
     router.address, // router
     usdg.address, // usdg
-    expandDecimals(60, 18), // maxUsdgBatchSize
-    expandDecimals(5, 18), // maxUsdgBuffer
+    expandDecimals(3000 * 1000, 18), // maxUsdgBatchSize
+    expandDecimals(200 * 1000, 18), // maxUsdgBuffer
     toUsd(5), //  liquidationFeeUsd
     600, // fundingRateFactor
-    16000000000, // maxGasPrice, 16 gwei
+    30000000000, // maxGasPrice, 30 gwei
     20000 // maxDebtBasisPoints
   ), "vault.initialize")
 
