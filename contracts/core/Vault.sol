@@ -542,7 +542,6 @@ contract Vault is ReentrancyGuard, IVault {
             delete positions[key];
         }
 
-
         if (usdOut > 0) {
             if (_isLong) {
                 _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, usdOut));

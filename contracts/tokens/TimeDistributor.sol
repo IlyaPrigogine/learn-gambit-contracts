@@ -45,18 +45,17 @@ contract TimeDistributor is IDistributor {
 
     function setTokensPerInterval(address _receiver, uint256 _amount) external onlyAdmin {
         if (lastDistributionTime[_receiver] != 0) {
-            uint256 currentTime = block.timestamp;
-            uint256 timeDiff = currentTime.sub(lastDistributionTime[_receiver]);
-            uint256 intervals = timeDiff.div(DISTRIBUTION_INTERVAL);
+            uint256 intervals = getIntervals(_receiver);
             require(intervals == 0, "TimeDistributor: pending distribution");
         }
 
         tokensPerInterval[_receiver] = _amount;
+        _updateLastDistributionTime(_receiver);
         emit TokensPerIntervalChange(_receiver, _amount);
     }
 
     function updateLastDistributionTime(address _receiver) external onlyAdmin {
-        lastDistributionTime[_receiver] = block.timestamp;
+        _updateLastDistributionTime(_receiver);
     }
 
     function setDistribution(
@@ -68,9 +67,7 @@ contract TimeDistributor is IDistributor {
             address receiver = _receivers[i];
 
             if (lastDistributionTime[receiver] != 0) {
-                uint256 currentTime = block.timestamp;
-                uint256 timeDiff = currentTime.sub(lastDistributionTime[receiver]);
-                uint256 intervals = timeDiff.div(DISTRIBUTION_INTERVAL);
+                uint256 intervals = getIntervals(receiver);
                 require(intervals == 0, "TimeDistributor: pending distribution");
             }
 
@@ -78,7 +75,7 @@ contract TimeDistributor is IDistributor {
             address rewardToken = _rewardTokens[i];
             tokensPerInterval[receiver] = amount;
             rewardTokens[receiver] = rewardToken;
-            lastDistributionTime[receiver] = block.timestamp;
+            _updateLastDistributionTime(receiver);
             emit DistributionChange(receiver, amount, rewardToken);
         }
     }
@@ -90,13 +87,13 @@ contract TimeDistributor is IDistributor {
         if (intervals == 0) { return 0; }
 
         uint256 amount = getDistributionAmount(receiver);
-        lastDistributionTime[msg.sender] = block.timestamp;
+        _updateLastDistributionTime(receiver);
 
         if (amount == 0) { return 0; }
 
-        IERC20(rewardTokens[receiver]).safeTransfer(msg.sender, amount);
+        IERC20(rewardTokens[receiver]).safeTransfer(receiver, amount);
 
-        emit Distribute(msg.sender, amount);
+        emit Distribute(receiver, amount);
         return amount;
     }
 
@@ -119,5 +116,9 @@ contract TimeDistributor is IDistributor {
     function getIntervals(address _receiver) public view returns (uint256) {
         uint256 timeDiff = block.timestamp.sub(lastDistributionTime[_receiver]);
         return timeDiff.div(DISTRIBUTION_INTERVAL);
+    }
+
+    function _updateLastDistributionTime(address _receiver) private {
+        lastDistributionTime[_receiver] = block.timestamp.div(DISTRIBUTION_INTERVAL).mul(DISTRIBUTION_INTERVAL);
     }
 }

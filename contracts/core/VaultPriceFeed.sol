@@ -126,7 +126,7 @@ contract VaultPriceFeed is IVaultPriceFeed {
         uint256 _priceDecimals = priceDecimals[_token];
         price = price.mul(PRICE_PRECISION).div(10 ** _priceDecimals);
 
-        if (_includeAmmPrice) {
+        if (_includeAmmPrice && isAmmEnabled) {
             uint256 ammPrice = getAmmPrice(_token);
             if (ammPrice > 0) {
                 if (_maximise && ammPrice > price) {
@@ -149,10 +149,6 @@ contract VaultPriceFeed is IVaultPriceFeed {
     }
 
     function getAmmPrice(address _token) public override view returns (uint256) {
-        if (!isAmmEnabled) {
-            return 0;
-        }
-
         if (_token == bnb) {
             // for bnbBusd, reserve0: BNB, reserve1: BUSD
             return getPairPrice(bnbBusd, true);

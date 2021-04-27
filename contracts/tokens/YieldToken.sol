@@ -157,8 +157,8 @@ contract YieldToken is IERC20, IYieldToken {
 
         _updateRewards(_account);
 
+        balances[_account] = balances[_account].sub(_amount, "YieldToken: burn amount exceeds balance");
         totalSupply = totalSupply.sub(_amount);
-        balances[_account] = balances[_account].sub(_amount);
 
         if (nonStakingAccounts[_account]) {
             nonStakingSupply = nonStakingSupply.sub(_amount);
