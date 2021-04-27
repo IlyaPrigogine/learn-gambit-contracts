@@ -9,8 +9,9 @@ import "../libraries/utils/Address.sol";
 
 import "../tokens/interfaces/IWETH.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/IRouter.sol";
 
-contract Router {
+contract Router is IRouter {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address payable;
@@ -23,6 +24,7 @@ contract Router {
     address public vault;
 
     mapping (address => bool) public plugins;
+    mapping (address => mapping (address => bool)) public approvedPlugins;
 
     event Swap(address account, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
 
@@ -43,7 +45,42 @@ contract Router {
         require(msg.sender == weth, "Router: invalid sender");
     }
 
-    function directPoolDeposit(address _token, uint256 _amount) public {
+    function setGov(address _gov) external onlyGov {
+        gov = _gov;
+    }
+
+    function addPlugin(address _plugin) external override onlyGov {
+        plugins[_plugin] = true;
+    }
+
+    function removePlugin(address _plugin) external onlyGov {
+        plugins[_plugin] = false;
+    }
+
+    function approvePlugin(address _plugin) external {
+        approvedPlugins[msg.sender][_plugin] = true;
+    }
+
+    function denyPlugin(address _plugin) external {
+        approvedPlugins[msg.sender][_plugin] = false;
+    }
+
+    function pluginTransfer(address _token, address _account, address _receiver, uint256 _amount) external {
+        _validatePlugin(_account);
+        IERC20(_token).safeTransferFrom(_account, _receiver, _amount);
+    }
+
+    function pluginIncreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external {
+        _validatePlugin(_account);
+        IVault(vault).increasePosition(_account, _collateralToken, _indexToken, _sizeDelta, _isLong);
+    }
+
+    function pluginDecreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external returns (uint256) {
+        _validatePlugin(_account);
+        return IVault(vault).decreasePosition(_account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, _receiver);
+    }
+
+    function directPoolDeposit(address _token, uint256 _amount) external {
         IERC20(_token).safeTransferFrom(_sender(), vault, _amount);
         IVault(vault).directPoolDeposit(_token);
     }
@@ -161,5 +198,10 @@ contract Router {
 
     function _sender() private view returns (address) {
         return msg.sender;
+    }
+
+    function _validatePlugin(address _account) private view {
+        require(plugins[msg.sender], "Router: invalid plugin");
+        require(approvedPlugins[_account][msg.sender], "Router: plugin not approved");
     }
 }

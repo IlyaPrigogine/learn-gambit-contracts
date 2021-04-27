@@ -44,7 +44,7 @@ describe("YieldToken", function () {
     await mineBlock(provider)
 
     await yieldToken.setYieldTrackers([yieldTracker0.address])
-    await yieldToken.claim(user1.address)
+    await yieldToken.connect(wallet).claim(user1.address)
     expect(await bnb.balanceOf(user1.address)).eq(800)
     expect(await bnb.balanceOf(yieldTracker0.address)).eq(200)
     expect(await btc.balanceOf(user1.address)).eq(0)
@@ -78,5 +78,58 @@ describe("YieldToken", function () {
 
     const tx3 = await yieldToken.transfer(user0.address, 200)
     await reportGasUsed(provider, tx3, "tranfer3 gas used")
+  })
+
+  it("nonStakingAccounts", async () => {
+    await bnb.mint(distributor0.address, 5000)
+    await btc.mint(distributor1.address, 5000)
+    await yieldToken.setYieldTrackers([yieldTracker0.address, yieldTracker1.address])
+
+    await yieldToken.transfer(user0.address, 200)
+    await yieldToken.transfer(user1.address, 300)
+
+    await increaseTime(provider, 60 * 60 + 10)
+    await mineBlock(provider)
+
+    expect(await bnb.balanceOf(wallet.address)).eq(0)
+    expect(await btc.balanceOf(wallet.address)).eq(0)
+    await yieldToken.connect(wallet).claim(wallet.address)
+    expect(await bnb.balanceOf(wallet.address)).eq(500)
+    expect(await btc.balanceOf(wallet.address)).eq(1000)
+
+    expect(await bnb.balanceOf(user0.address)).eq(0)
+    expect(await btc.balanceOf(user0.address)).eq(0)
+    await yieldToken.connect(user0).claim(user0.address)
+    expect(await bnb.balanceOf(user0.address)).eq(200)
+    expect(await btc.balanceOf(user0.address)).eq(400)
+
+    expect(await bnb.balanceOf(user1.address)).eq(0)
+    expect(await btc.balanceOf(user1.address)).eq(0)
+    await yieldToken.connect(user1).claim(user1.address)
+    expect(await bnb.balanceOf(user1.address)).eq(300)
+    expect(await btc.balanceOf(user1.address)).eq(600)
+
+    await yieldToken.addNonStakingAccount(wallet.address)
+
+    await increaseTime(provider, 60 * 60 + 10)
+    await mineBlock(provider)
+
+    expect(await bnb.balanceOf(wallet.address)).eq(500)
+    expect(await btc.balanceOf(wallet.address)).eq(1000)
+    await yieldToken.connect(wallet).claim(wallet.address)
+    expect(await bnb.balanceOf(wallet.address)).eq(500)
+    expect(await btc.balanceOf(wallet.address)).eq(1000)
+
+    expect(await bnb.balanceOf(user0.address)).eq(200)
+    expect(await btc.balanceOf(user0.address)).eq(400)
+    await yieldToken.connect(user0).claim(user0.address)
+    expect(await bnb.balanceOf(user0.address)).eq(200 + 400)
+    expect(await btc.balanceOf(user0.address)).eq(400 + 800)
+
+    expect(await bnb.balanceOf(user1.address)).eq(300)
+    expect(await btc.balanceOf(user1.address)).eq(600)
+    await yieldToken.connect(user1).claim(user1.address)
+    expect(await bnb.balanceOf(user1.address)).eq(300 + 600)
+    expect(await btc.balanceOf(user1.address)).eq(600 + 1200)
   })
 })

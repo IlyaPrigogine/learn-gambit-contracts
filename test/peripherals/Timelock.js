@@ -61,6 +61,7 @@ describe("Timelock", function () {
     await vaultPriceFeed.setTokenConfig(dai.address, daiPriceFeed.address, 8, false)
 
     await vaultPriceFeed.setGov(timelock.address)
+    await router.setGov(timelock.address)
   })
 
   it("inits", async () => {
@@ -208,6 +209,9 @@ describe("Timelock", function () {
     const action0 = ethers.utils.solidityKeccak256(["string", "address", "address", "uint256"], ["approve", bnb.address, user1.address, expandDecimals(100, 18)])
     const action1 = ethers.utils.solidityKeccak256(["string", "address", "address", "uint256"], ["approve", dai.address, user1.address, expandDecimals(100, 18)])
 
+    await expect(timelock.connect(user0).cancelAction(action0))
+      .to.be.revertedWith("Timelock: forbidden")
+
     await expect(timelock.connect(wallet).cancelAction(action0))
       .to.be.revertedWith("Timelock: invalid _action")
 
@@ -316,6 +320,57 @@ describe("Timelock", function () {
     await timelock.connect(wallet).cancelAction(action1)
 
     await expect(timelock.connect(wallet).setPriceFeed(vault.address, user2.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+  })
+
+  it("addPlugin", async () => {
+    await expect(timelock.connect(user0).addPlugin(router.address, user1.address))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    await expect(timelock.connect(wallet).addPlugin(router.address, user1.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+
+    await expect(timelock.connect(user0).signalAddPlugin(router.address, user1.address))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    await timelock.connect(wallet).signalAddPlugin(router.address, user1.address)
+
+    await expect(timelock.connect(wallet).addPlugin(router.address, user1.address))
+      .to.be.revertedWith("Timelock: action time not yet passed")
+
+    await increaseTime(provider, 4 * 24 * 60 * 60)
+    await mineBlock(provider)
+
+    await expect(timelock.connect(wallet).addPlugin(router.address, user1.address))
+      .to.be.revertedWith("Timelock: action time not yet passed")
+
+    await increaseTime(provider, 1 * 24 * 60 * 60 + 10)
+    await mineBlock(provider)
+
+    await expect(timelock.connect(wallet).addPlugin(user2.address, user1.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+
+    await expect(timelock.connect(wallet).addPlugin(router.address, user2.address))
+      .to.be.revertedWith("Timelock: action not signalled")
+
+    expect(await router.plugins(user1.address)).eq(false)
+    await timelock.connect(wallet).addPlugin(router.address, user1.address)
+    expect(await router.plugins(user1.address)).eq(true)
+
+    await timelock.connect(wallet).signalAddPlugin(router.address, user2.address)
+
+    await expect(timelock.connect(wallet).addPlugin(router.address, user2.address))
+      .to.be.revertedWith("Timelock: action time not yet passed")
+
+    const action0 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["addPlugin", user1.address, user2.address])
+    const action1 = ethers.utils.solidityKeccak256(["string", "address", "address"], ["addPlugin", router.address, user2.address])
+
+    await expect(timelock.connect(wallet).cancelAction(action0))
+      .to.be.revertedWith("Timelock: invalid _action")
+
+    await timelock.connect(wallet).cancelAction(action1)
+
+    await expect(timelock.connect(wallet).addPlugin(router.address, user2.address))
       .to.be.revertedWith("Timelock: action not signalled")
   })
 })

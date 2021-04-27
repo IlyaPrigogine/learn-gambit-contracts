@@ -5,6 +5,7 @@ pragma solidity 0.6.12;
 import "./interfaces/ITimelockTarget.sol";
 import "../core/interfaces/IVault.sol";
 import "../core/interfaces/IVaultPriceFeed.sol";
+import "../core/interfaces/IRouter.sol";
 
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
@@ -21,7 +22,8 @@ contract Timelock {
     event SignalPendingAction(bytes32 action);
     event SignalApprove(address token, address spender, uint256 amount, bytes32 action);
     event SignalSetGov(address target, address gov, bytes32 action);
-    event SignalSetPriceFeed(address target, address priceFeed, bytes32 action);
+    event SignalSetPriceFeed(address vault, address priceFeed, bytes32 action);
+    event SignalAddPlugin(address router, address plugin, bytes32 action);
     event ClearAction(bytes32 action);
 
     modifier onlyAdmin() {
@@ -101,6 +103,19 @@ contract Timelock {
         bytes32 action = keccak256(abi.encodePacked("setPriceFeed", _vault, _priceFeed));
         _validateAction(action);
         IVault(_vault).setPriceFeed(_priceFeed);
+        _clearAction(action);
+    }
+
+    function signalAddPlugin(address _router, address _plugin) external onlyAdmin {
+        bytes32 action = keccak256(abi.encodePacked("addPlugin", _router, _plugin));
+        _setPendingAction(action);
+        emit SignalAddPlugin(_router, _plugin, action);
+    }
+
+    function addPlugin(address _router, address _plugin) external onlyAdmin {
+        bytes32 action = keccak256(abi.encodePacked("addPlugin", _router, _plugin));
+        _validateAction(action);
+        IRouter(_router).addPlugin(_plugin);
         _clearAction(action);
     }
 

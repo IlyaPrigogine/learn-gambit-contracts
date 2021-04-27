@@ -80,6 +80,104 @@ describe("Router", function () {
     await vault.setIsMintingEnabled(true)
   })
 
+  it("setGov", async () => {
+    await expect(router.connect(user0).setGov(user1.address))
+      .to.be.revertedWith("Router: forbidden")
+
+    expect(await router.gov()).eq(wallet.address)
+
+    await router.setGov(user0.address)
+    expect(await router.gov()).eq(user0.address)
+
+    await router.connect(user0).setGov(user1.address)
+    expect(await router.gov()).eq(user1.address)
+  })
+
+  it("addPlugin", async () => {
+    await expect(router.connect(user0).addPlugin(user1.address))
+      .to.be.revertedWith("Router: forbidden")
+
+    await router.setGov(user0.address)
+
+    expect(await router.plugins(user1.address)).eq(false)
+    await router.connect(user0).addPlugin(user1.address)
+    expect(await router.plugins(user1.address)).eq(true)
+  })
+
+  it("removePlugin", async () => {
+    await expect(router.connect(user0).removePlugin(user1.address))
+      .to.be.revertedWith("Router: forbidden")
+
+    await router.setGov(user0.address)
+
+    expect(await router.plugins(user1.address)).eq(false)
+    await router.connect(user0).addPlugin(user1.address)
+    expect(await router.plugins(user1.address)).eq(true)
+    await router.connect(user0).removePlugin(user1.address)
+    expect(await router.plugins(user1.address)).eq(false)
+  })
+
+  it("approvePlugin", async () => {
+    expect(await router.approvedPlugins(user0.address, user1.address)).eq(false)
+    await router.connect(user0).approvePlugin(user1.address)
+    expect(await router.approvedPlugins(user0.address, user1.address)).eq(true)
+  })
+
+  it("denyPlugin", async () => {
+    expect(await router.approvedPlugins(user0.address, user1.address)).eq(false)
+    await router.connect(user0).approvePlugin(user1.address)
+    expect(await router.approvedPlugins(user0.address, user1.address)).eq(true)
+    await router.connect(user0).denyPlugin(user1.address)
+    expect(await router.approvedPlugins(user0.address, user1.address)).eq(false)
+  })
+
+  it("pluginTransfer", async () => {
+    await router.addPlugin(user1.address)
+    await router.connect(user0).approvePlugin(user1.address)
+
+    await dai.mint(user0.address, 2000)
+    await dai.connect(user0).approve(router.address, 1000)
+    expect(await dai.allowance(user0.address, router.address)).eq(1000)
+    expect(await dai.balanceOf(user2.address)).eq(0)
+    await router.connect(user1).pluginTransfer(dai.address, user0.address, user2.address, 800)
+    expect(await dai.allowance(user0.address, router.address)).eq(200)
+    expect(await dai.balanceOf(user2.address)).eq(800)
+
+    await expect(router.connect(user2).pluginTransfer(dai.address, user0.address, user2.address, 1))
+      .to.be.revertedWith("Router: invalid plugin")
+    await router.addPlugin(user2.address)
+    await expect(router.connect(user2).pluginTransfer(dai.address, user0.address, user2.address, 1))
+      .to.be.revertedWith("Router: plugin not approved")
+  })
+
+  it("pluginIncreasePosition", async () => {
+    await router.addPlugin(user1.address)
+    await router.connect(user0).approvePlugin(user1.address)
+
+    await expect(router.connect(user1).pluginIncreasePosition(user0.address, bnb.address, bnb.address, 1000, true))
+      .to.be.revertedWith("Vault: insufficient collateral for fees")
+
+    await expect(router.connect(user2).pluginIncreasePosition(user0.address, bnb.address, bnb.address, 1000, true))
+      .to.be.revertedWith("Router: invalid plugin")
+    await router.addPlugin(user2.address)
+    await expect(router.connect(user2).pluginIncreasePosition(user0.address, bnb.address, bnb.address, 1000, true))
+      .to.be.revertedWith("Router: plugin not approved")
+  })
+
+  it("pluginDecreasePosition", async () => {
+    await router.addPlugin(user1.address)
+    await router.connect(user0).approvePlugin(user1.address)
+
+    await expect(router.connect(user1).pluginDecreasePosition(user0.address, bnb.address, bnb.address, 100, 1000, true, user0.address))
+      .to.be.revertedWith("Vault: empty position")
+
+    await expect(router.connect(user2).pluginDecreasePosition(user0.address, bnb.address, bnb.address, 100, 1000, true, user0.address))
+      .to.be.revertedWith("Router: invalid plugin")
+    await router.addPlugin(user2.address)
+    await expect(router.connect(user2).pluginDecreasePosition(user0.address, bnb.address, bnb.address, 100, 1000, true, user0.address))
+      .to.be.revertedWith("Router: plugin not approved")
+  })
+
   it("swap, buy USDG", async () => {
     await vaultPriceFeed.getPrice(dai.address, true, true)
     await dai.mint(user0.address, expandDecimals(200, 18))
