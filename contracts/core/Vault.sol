@@ -36,6 +36,7 @@ contract Vault is ReentrancyGuard, IVault {
 
     bool public isInitialized;
     bool public isMintingEnabled = false;
+    bool public isSwapEnabled = true;
 
     address public router;
     address public override priceFeed;
@@ -201,9 +202,14 @@ contract Vault is ReentrancyGuard, IVault {
         maxDebtBasisPoints = _maxDebtBasisPoints;
     }
 
-    function enableMinting() external override {
+    function setIsMintingEnabled(bool _isMintingEnabled) external override {
         _onlyGov();
-        isMintingEnabled = true;
+        isMintingEnabled = _isMintingEnabled;
+    }
+
+    function setIsSwapEnabled(bool _isSwapEnabled) external override {
+        _onlyGov();
+        isSwapEnabled = _isSwapEnabled;
     }
 
     function setGov(address _gov) external {
@@ -391,6 +397,7 @@ contract Vault is ReentrancyGuard, IVault {
 
     function swap(address _tokenIn, address _tokenOut, address _receiver) external override nonReentrant returns (uint256) {
         _validateGasPrice();
+        require(isSwapEnabled, "Vault: swaps not enabled");
         require(whitelistedTokens[_tokenIn], "Vault: _tokenIn not whitelisted");
         require(whitelistedTokens[_tokenOut], "Vault: _tokenOut not whitelisted");
         require(_tokenIn != _tokenOut, "Vault: invalid tokens");

@@ -73,15 +73,26 @@ describe("Vault.settings", function () {
     expect(await vault.isMintingEnabled()).eq(false)
   })
 
-  it("enableMinting", async () => {
-    await expect(vault.connect(user0).enableMinting())
+  it("setIsMintingEnabled", async () => {
+    await expect(vault.connect(user0).setIsMintingEnabled(true))
       .to.be.revertedWith("Vault: forbidden")
 
     await vault.setGov(user0.address)
 
     expect(await vault.isMintingEnabled()).eq(false)
-    await vault.connect(user0).enableMinting()
+    await vault.connect(user0).setIsMintingEnabled(true)
     expect(await vault.isMintingEnabled()).eq(true)
+  })
+
+  it("setIsSwapEnabled", async () => {
+    await expect(vault.connect(user0).setIsSwapEnabled(false))
+      .to.be.revertedWith("Vault: forbidden")
+
+    await vault.setGov(user0.address)
+
+    expect(await vault.isSwapEnabled()).eq(true)
+    await vault.connect(user0).setIsSwapEnabled(false)
+    expect(await vault.isSwapEnabled()).eq(false)
   })
 
   it("setGov", async () => {

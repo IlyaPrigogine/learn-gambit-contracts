@@ -50,7 +50,7 @@ describe("Vault.increaseLongPosition", function () {
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
     await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
@@ -64,6 +64,9 @@ describe("Vault.increaseLongPosition", function () {
       .to.be.revertedWith("Vault: maxGasPrice exceeded")
     await expect(vault.connect(user1).increasePosition(user0.address, btc.address, btc.address, 0, true))
       .to.be.revertedWith("Vault: invalid msg.sender")
+    await vault.connect(user0).addRouter(user1.address)
+    await expect(vault.connect(user1).increasePosition(user0.address, btc.address, bnb.address, 0, true))
+      .to.be.revertedWith("Vault: mismatched tokens")
     await expect(vault.connect(user0).increasePosition(user0.address, btc.address, bnb.address, toUsd(1000), true))
       .to.be.revertedWith("Vault: mismatched tokens")
     await expect(vault.connect(user0).increasePosition(user0.address, dai.address, dai.address, toUsd(1000), true))

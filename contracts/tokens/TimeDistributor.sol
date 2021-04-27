@@ -55,6 +55,10 @@ contract TimeDistributor is IDistributor {
         emit TokensPerIntervalChange(_receiver, _amount);
     }
 
+    function updateLastDistributionTime(address _receiver) external onlyAdmin {
+        lastDistributionTime[_receiver] = block.timestamp;
+    }
+
     function setDistribution(
         address[] calldata _receivers,
         uint256[] calldata _amounts,

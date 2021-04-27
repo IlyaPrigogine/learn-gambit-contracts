@@ -107,13 +107,22 @@ describe("Timelock", function () {
     expect(await vaultPriceFeed.priceSampleSpace()).eq(1)
   })
 
-  it("enableMinting", async () => {
-    await expect(timelock.connect(user0).enableMinting(vault.address))
+  it("setIsMintingEnabled", async () => {
+    await expect(timelock.connect(user0).setIsMintingEnabled(vault.address, true))
       .to.be.revertedWith("Timelock: forbidden")
 
     expect(await vault.isMintingEnabled()).eq(false)
-    await timelock.connect(wallet).enableMinting(vault.address)
+    await timelock.connect(wallet).setIsMintingEnabled(vault.address, true)
     expect(await vault.isMintingEnabled()).eq(true)
+  })
+
+  it("setIsSwapEnabled", async () => {
+    await expect(timelock.connect(user0).setIsSwapEnabled(vault.address, false))
+      .to.be.revertedWith("Timelock: forbidden")
+
+    expect(await vault.isSwapEnabled()).eq(true)
+    await timelock.connect(wallet).setIsSwapEnabled(vault.address, false)
+    expect(await vault.isSwapEnabled()).eq(false)
   })
 
   it("setMaxUsdg", async () => {
@@ -178,6 +187,8 @@ describe("Timelock", function () {
       .to.be.revertedWith("ERC20: transfer amount exceeds allowance")
 
     await timelock.connect(wallet).approve(dai.address, user1.address, expandDecimals(100, 18))
+    await expect(dai.connect(user2).transferFrom(timelock.address, user2.address, expandDecimals(100, 18)))
+      .to.be.revertedWith("ERC20: transfer amount exceeds allowance")
     await dai.connect(user1).transferFrom(timelock.address, user1.address, expandDecimals(100, 18))
 
     expect(await dai.balanceOf(timelock.address)).eq(expandDecimals(50, 18))

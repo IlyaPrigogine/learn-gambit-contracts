@@ -77,7 +77,7 @@ describe("Router", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
     await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
   })
 
   it("swap, buy USDG", async () => {

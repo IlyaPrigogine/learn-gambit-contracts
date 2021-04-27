@@ -3,7 +3,9 @@
 pragma solidity 0.6.12;
 
 interface IVault {
-    function enableMinting() external;
+    function setIsMintingEnabled(bool _isMintingEnabled) external;
+    function setIsSwapEnabled(bool _isSwapEnabled) external;
+
     function setPriceFeed(address _ammPriceFeed) external;
     function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external;
     function setMaxGasPrice(uint256 _maxGasPrice) external;

@@ -50,7 +50,7 @@ describe("Vault.withdrawFees", function () {
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
     await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
@@ -61,7 +61,7 @@ describe("Vault.withdrawFees", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
     await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     expect(await vault.getMaxUsdgAmount()).eq(expandDecimals(600 * 1000, 18))
 
@@ -139,7 +139,7 @@ describe("Vault.withdrawFees", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
     await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     expect(await vault.getMaxUsdgAmount()).eq(expandDecimals(600 * 1000, 18))
 

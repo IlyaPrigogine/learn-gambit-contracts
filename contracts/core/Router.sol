@@ -15,20 +15,33 @@ contract Router {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
+    address public gov;
+
     // wrapped BNB / ETH
     address public weth;
     address public usdg;
     address public vault;
 
+    mapping (address => bool) public plugins;
+
     event Swap(address account, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+
+    modifier onlyGov() {
+        require(msg.sender == gov, "Router: forbidden");
+        _;
+    }
 
     constructor(address _vault, address _usdg, address _weth) public {
         vault = _vault;
         usdg = _usdg;
         weth = _weth;
+
+        gov = msg.sender;
     }
 
-    receive() external payable {}
+    receive() external payable {
+        require(msg.sender == weth, "Router: invalid sender");
+    }
 
     function directPoolDeposit(address _token, uint256 _amount) public {
         IERC20(_token).safeTransferFrom(_sender(), vault, _amount);

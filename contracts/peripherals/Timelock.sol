@@ -45,8 +45,12 @@ contract Timelock {
         IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);
     }
 
-    function enableMinting(address _vault) external onlyAdmin {
-        IVault(_vault).enableMinting();
+    function setIsMintingEnabled(address _vault, bool _isMintingEnabled) external onlyAdmin {
+        IVault(_vault).setIsMintingEnabled(_isMintingEnabled);
+    }
+
+    function setIsSwapEnabled(address _vault, bool _isSwapEnabled) external onlyAdmin {
+        IVault(_vault).setIsSwapEnabled(_isSwapEnabled);
     }
 
     function setMaxUsdg(address _vault,uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external onlyAdmin {

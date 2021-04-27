@@ -65,7 +65,7 @@ describe("Vault.buyUSDG", function () {
     await expect(vault.buyUSDG(bnb.address, wallet.address))
       .to.be.revertedWith("Vault: _token not whitelisted")
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
       .to.be.revertedWith("Vault: _token not whitelisted")
@@ -121,7 +121,7 @@ describe("Vault.buyUSDG", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
     await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     expect(await vault.getMaxUsdgAmount()).eq(expandDecimals(600 * 1000, 18))
 
@@ -182,7 +182,7 @@ describe("Vault.buyUSDG", function () {
   })
 
   it("buyUSDG uses min price", async () => {
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
     await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
       .to.be.revertedWith("Vault: _token not whitelisted")
 
@@ -208,7 +208,7 @@ describe("Vault.buyUSDG", function () {
   })
 
   it("buyUSDG updates fees", async () => {
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
     await expect(vault.connect(user0).buyUSDG(bnb.address, user1.address))
       .to.be.revertedWith("Vault: _token not whitelisted")
 
@@ -231,7 +231,7 @@ describe("Vault.buyUSDG", function () {
   })
 
   it("buyUSDG uses stableSwapFeeBasisPoints", async () => {
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
     await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
 
@@ -254,7 +254,7 @@ describe("Vault.buyUSDG", function () {
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
     await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     await expect(vault.connect(user0).buyUSDG(btc.address, user1.address))
       .to.be.revertedWith("Vault: invalid tokenAmount")

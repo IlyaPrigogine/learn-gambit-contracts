@@ -46,6 +46,11 @@ contract YieldTracker is IYieldTracker, ReentrancyGuard {
         distributor = _distributor;
     }
 
+    // to help users who accidentally send their tokens to this contract
+    function withdrawToken(address _token, address _account, uint256 _amount) external onlyGov {
+        IERC20(_token).safeTransfer(_account, _amount);
+    }
+
     function claim(address _account, address _receiver) external override returns (uint256) {
         require(msg.sender == yieldToken, "YieldTracker: forbidden");
         updateRewards(_account);

@@ -55,7 +55,7 @@ describe("Vault.swap", function () {
     await bnb.mint(distributor0.address, 5000)
     await usdg.setYieldTrackers([yieldTracker0.address])
 
-    await vault.enableMinting()
+    await vault.setIsMintingEnabled(true)
 
     await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
     await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
@@ -69,6 +69,13 @@ describe("Vault.swap", function () {
 
     await expect(vault.connect(user1).swap(bnb.address, btc.address, user2.address))
       .to.be.revertedWith("Vault: _tokenIn not whitelisted")
+
+    await vault.setIsSwapEnabled(false)
+
+    await expect(vault.connect(user1).swap(bnb.address, btc.address, user2.address))
+      .to.be.revertedWith("Vault: swaps not enabled")
+
+    await vault.setIsSwapEnabled(true)
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(300))
     await vault.setTokenConfig(...getBnbConfig(bnb, bnbPriceFeed))
