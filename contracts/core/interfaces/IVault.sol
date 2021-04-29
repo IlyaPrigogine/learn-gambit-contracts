@@ -23,6 +23,7 @@ interface IVault {
     function cumulativeFundingRates(address _token) external view returns (uint256);
     function getNextFundingRate(address _token) external view returns (uint256);
 
+    function feeReserves(address _token) external view returns (uint256);
     function tokenDecimals(address _token) external view returns (uint256);
     function guaranteedUsd(address _token) external view returns (uint256);
     function poolAmounts(address _token) external view returns (uint256);

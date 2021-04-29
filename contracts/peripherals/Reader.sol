@@ -8,10 +8,28 @@ import "../libraries/math/SafeMath.sol";
 import "../core/interfaces/IVault.sol";
 import "../core/interfaces/IVaultPriceFeed.sol";
 import "../tokens/interfaces/IYieldTracker.sol";
+import "../tokens/interfaces/IYieldToken.sol";
 import "../amm/interfaces/IPancakeFactory.sol";
 
 contract Reader {
     using SafeMath for uint256;
+
+    function getFees(address _vault, address[] memory _tokens) public view returns (uint256[] memory) {
+        uint256[] memory amounts = new uint256[](_tokens.length);
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            amounts[i] = IVault(_vault).feeReserves(_tokens[i]);
+        }
+        return amounts;
+    }
+
+    function getTotalStaked(address[] memory _yieldTokens) public view returns (uint256[] memory) {
+        uint256[] memory amounts = new uint256[](_yieldTokens.length);
+        for (uint256 i = 0; i < _yieldTokens.length; i++) {
+            IYieldToken yieldToken = IYieldToken(_yieldTokens[i]);
+            amounts[i] = yieldToken.totalStaked();
+        }
+        return amounts;
+    }
 
     function getStakingInfo(address _account, address[] memory _yieldTrackers) public view returns (uint256[] memory) {
         uint256 propsLength = 2;

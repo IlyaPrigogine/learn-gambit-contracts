@@ -97,7 +97,7 @@ contract Vault is ReentrancyGuard, IVault {
 
     mapping (bytes32 => Position) public positions;
 
-    mapping (address => uint256) public feeReserves;
+    mapping (address => uint256) public override feeReserves;
 
     event BuyUSDG(address account, address token, uint256 tokenAmount, uint256 usdgAmount);
     event SellUSDG(address account, address token, uint256 usdgAmount, uint256 tokenAmount);
