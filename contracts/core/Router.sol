@@ -65,17 +65,17 @@ contract Router is IRouter {
         approvedPlugins[msg.sender][_plugin] = false;
     }
 
-    function pluginTransfer(address _token, address _account, address _receiver, uint256 _amount) external {
+    function pluginTransfer(address _token, address _account, address _receiver, uint256 _amount) external override { 
         _validatePlugin(_account);
         IERC20(_token).safeTransferFrom(_account, _receiver, _amount);
     }
 
-    function pluginIncreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external {
+    function pluginIncreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external override {
         _validatePlugin(_account);
         IVault(vault).increasePosition(_account, _collateralToken, _indexToken, _sizeDelta, _isLong);
     }
 
-    function pluginDecreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external returns (uint256) {
+    function pluginDecreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external override returns (uint256) {
         _validatePlugin(_account);
         return IVault(vault).decreasePosition(_account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, _receiver);
     }
@@ -85,7 +85,7 @@ contract Router is IRouter {
         IVault(vault).directPoolDeposit(_token);
     }
 
-    function swap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) public {
+    function swap(address[] memory _path, uint256 _amountIn, uint256 _minOut, address _receiver) public override {
         IERC20(_path[0]).safeTransferFrom(_sender(), vault, _amountIn);
         uint256 amountOut = _swap(_path, _minOut, _receiver);
         emit Swap(msg.sender, _path[0], _path[_path.length - 1], _amountIn, amountOut);
