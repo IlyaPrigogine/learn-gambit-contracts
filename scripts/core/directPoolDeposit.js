@@ -38,27 +38,29 @@ async function main() {
   for (let i = 0; i < tokens.length; i++) {
     const token = await contractAt("YieldToken", tokens[i].address)
     const poolAmount = await vault.poolAmounts(token.address)
+    const feeReserve = await vault.feeReserves(token.address)
     const balance = await token.balanceOf(vault.address)
-    if (poolAmount.gt(balance)) {
-      console.log(`${token.address}: poolAmount.gt(balance): ${poolAmount.toString()}, ${balance.toString()}, ${poolAmount.sub(balance).toString()}`)
+    const vaultAmount = poolAmount.add(feeReserve)
+    if (vaultAmount.gt(balance)) {
+      console.log(`${token.address}: vaultAmount.gt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${vaultAmount.sub(balance).toString()}`)
     } else {
-      console.log(`${token.address}: poolAmount.lt(balance): ${poolAmount.toString()}, ${balance.toString()}, ${balance.sub(poolAmount).toString()}`)
+      console.log(`${token.address}: vaultAmount.lt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${balance.sub(vaultAmount).toString()}`)
     }
   }
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = await contractAt("YieldToken", tokens[i].address)
-    const poolAmount = await vault.poolAmounts(token.address)
-    const balance = await token.balanceOf(vault.address)
-    if (poolAmount.gt(balance)) {
-      const amount = poolAmount.sub(balance).mul(110).div(100)
-      console.log("transfer", token.address, amount.toString())
-      await sendTxn(token.transfer(vault.address, amount), `token.transfer ${i}`)
-    }
-    const amount = ethers.utils.parseUnits(tokens[i].amount, tokenDecimals).div(2)
-    console.log("sending", token.address, amount.toString())
-    await sendTxn(router.directPoolDeposit(token.address, amount), `router.directPoolDeposit ${i}`)
-  }
+  // for (let i = 0; i < tokens.length; i++) {
+  //   const token = await contractAt("YieldToken", tokens[i].address)
+  //   const poolAmount = await vault.poolAmounts(token.address)
+  //   const balance = await token.balanceOf(vault.address)
+  //   if (poolAmount.gt(balance)) {
+  //     const amount = poolAmount.sub(balance).mul(110).div(100)
+  //     console.log("transfer", token.address, amount.toString())
+  //     await sendTxn(token.transfer(vault.address, amount), `token.transfer ${i}`)
+  //   }
+  //   const amount = ethers.utils.parseUnits(tokens[i].amount, tokenDecimals).div(2)
+  //   console.log("sending", token.address, amount.toString())
+  //   await sendTxn(router.directPoolDeposit(token.address, amount), `router.directPoolDeposit ${i}`)
+  // }
 }
 
 main()

@@ -33,16 +33,18 @@ async function main() {
     amount: "8134.1596"
   }
 
-  const tokens = [busd, usdc, usdt]
+  const tokens = [btc, eth, bnb, busd, usdc, usdt]
 
   for (let i = 0; i < tokens.length; i++) {
     const token = await contractAt("YieldToken", tokens[i].address)
     const poolAmount = await vault.poolAmounts(token.address)
+    const feeReserve = await vault.feeReserves(token.address)
     const balance = await token.balanceOf(vault.address)
-    if (poolAmount.gt(balance)) {
-      console.log(`${token.address}: poolAmount.gt(balance): ${poolAmount.toString()}, ${balance.toString()}, ${poolAmount.sub(balance).toString()}, ${ethers.utils.formatUnits(poolAmount.sub(balance), 18)}`)
+    const vaultAmount = poolAmount.add(feeReserve)
+    if (vaultAmount.gt(balance)) {
+      console.log(`${token.address}: vaultAmount.gt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${vaultAmount.sub(balance).toString()}`)
     } else {
-      console.log(`${token.address}: poolAmount.lt(balance): ${poolAmount.toString()}, ${balance.toString()}, ${balance.sub(poolAmount).toString()}, ${ethers.utils.formatUnits(balance.sub(poolAmount), 18)}`)
+      console.log(`${token.address}: vaultAmount.lt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${balance.sub(vaultAmount).toString()}`)
     }
   }
 }
