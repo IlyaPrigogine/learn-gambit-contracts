@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig, validateVaultBalance } = require("./helpers")
 
 use(solidity)
 
@@ -151,5 +151,7 @@ describe("Vault.fundingRates", function () {
     expect(await vault.guaranteedUsd(btc.address)).eq(toUsd(34.09))
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 16878 - 106 - 1 - 2123 - 219) // 0.00002123* 47100 => 1 USD
     expect(await btc.balanceOf(user2.address)).eq(16878 + 2123 - 20)
+
+    await validateVaultBalance(expect, vault, btc, 2)
   })
 })

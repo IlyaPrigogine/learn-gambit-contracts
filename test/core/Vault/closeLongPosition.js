@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig, validateVaultBalance } = require("./helpers")
 
 use(solidity)
 
@@ -116,6 +116,8 @@ describe("Vault.closeLongPosition", function () {
     expect(await vault.guaranteedUsd(btc.address)).eq(0)
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219 - 39957 - 191) // 0.00040148 * 47100 => ~18.9 USD
     expect(await btc.balanceOf(user2.address)).eq(39957) // 0.00039957 * 47100 => 18.82 USD
+
+    await validateVaultBalance(expect, vault, btc)
   })
 
   it("close long position with loss", async () => {
@@ -177,5 +179,7 @@ describe("Vault.closeLongPosition", function () {
     expect(await vault.guaranteedUsd(btc.address)).eq(0)
     expect(await vault.poolAmounts(btc.address)).eq(274250 - 219 - 13923 - 230) // 0.00013923 * 39000 => ~5.42 USD
     expect(await btc.balanceOf(user2.address)).eq(13922) // 0.00013922 * 39000 => 5.42958 USD
+
+    await validateVaultBalance(expect, vault, btc, 1)
   })
 })

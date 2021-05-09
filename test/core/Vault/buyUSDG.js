@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig, validateVaultBalance } = require("./helpers")
 
 use(solidity)
 
@@ -92,6 +92,8 @@ describe("Vault.buyUSDG", function () {
     expect(await vault.feeReserves(bnb.address)).eq(1)
     expect(await vault.usdgAmounts(bnb.address)).eq(29700)
     expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+
+    await validateVaultBalance(expect, vault, bnb)
   })
 
   it("buyUSDG allows gov to mint", async () => {
@@ -115,6 +117,8 @@ describe("Vault.buyUSDG", function () {
     expect(await vault.feeReserves(bnb.address)).eq(1)
     expect(await vault.usdgAmounts(bnb.address)).eq(29700)
     expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+
+    await validateVaultBalance(expect, vault, bnb)
   })
 
   it("buyUSDG caps mint amount", async () => {
@@ -179,6 +183,9 @@ describe("Vault.buyUSDG", function () {
 
     expect(await vault.usdgAmounts(bnb.address)).eq("329010000000000000000000") // 329,010
     expect(await vault.poolAmounts(bnb.address)).eq("1096700000000000000000") // 1096.7
+
+    await validateVaultBalance(expect, vault, btc)
+    await validateVaultBalance(expect, vault, bnb)
   })
 
   it("buyUSDG uses min price", async () => {
@@ -205,6 +212,8 @@ describe("Vault.buyUSDG", function () {
     expect(await vault.feeReserves(bnb.address)).eq(1)
     expect(await vault.usdgAmounts(bnb.address)).eq(19800)
     expect(await vault.poolAmounts(bnb.address)).eq(100 - 1)
+
+    await validateVaultBalance(expect, vault, bnb)
   })
 
   it("buyUSDG updates fees", async () => {
@@ -228,6 +237,8 @@ describe("Vault.buyUSDG", function () {
     expect(await vault.feeReserves(bnb.address)).eq(30)
     expect(await vault.usdgAmounts(bnb.address)).eq(9970 * 300)
     expect(await vault.poolAmounts(bnb.address)).eq(10000 - 30)
+
+    await validateVaultBalance(expect, vault, bnb)
   })
 
   it("buyUSDG uses stableSwapFeeBasisPoints", async () => {
@@ -272,5 +283,7 @@ describe("Vault.buyUSDG", function () {
     expect(await usdg.balanceOf(user1.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(180, 18))) // 0.3% of 60,000 => 180
     expect(await vault.usdgAmounts(btc.address)).eq(expandDecimals(60000, 18).sub(expandDecimals(180, 18)))
     expect(await vault.poolAmounts(btc.address)).eq(expandDecimals(1, 8).sub(300000))
+
+    await validateVaultBalance(expect, vault, btc)
   })
 })

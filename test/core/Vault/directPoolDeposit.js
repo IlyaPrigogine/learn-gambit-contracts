@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig } = require("./helpers")
+const { initVault, getBnbConfig, validateVaultBalance } = require("./helpers")
 
 use(solidity)
 
@@ -74,5 +74,7 @@ describe("Vault.settings", function () {
     expect(await vault.poolAmounts(bnb.address)).eq(0)
     await vault.connect(user0).directPoolDeposit(bnb.address)
     expect(await vault.poolAmounts(bnb.address)).eq(1000)
+
+    await validateVaultBalance(expect, vault, bnb)
   })
 })
