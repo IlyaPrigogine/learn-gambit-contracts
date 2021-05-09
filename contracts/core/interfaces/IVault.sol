@@ -17,6 +17,7 @@ interface IVault {
     function swap(address _tokenIn, address _tokenOut, address _receiver) external returns (uint256);
     function increasePosition(address _account, address _collateralToken, address _indexToken, uint256 _sizeDelta, bool _isLong) external;
     function decreasePosition(address _account, address _collateralToken, address _indexToken, uint256 _collateralDelta, uint256 _sizeDelta, bool _isLong, address _receiver) external returns (uint256);
+    function tokenToUsdMin(address _token, uint256 _tokenAmount) external view returns (uint256);
 
     function priceFeed() external view returns (address);
     function fundingRateFactor() external view returns (uint256);
