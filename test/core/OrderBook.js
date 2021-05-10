@@ -71,15 +71,13 @@ describe("OrderBook", function () {
         await vault.setIsMintingEnabled(true)
 
         orderBook = await deployContract("OrderBook", [])
-        const executionGasLimit = 100000;
-        const gasPrice = 5;
+        const minExecutionFee = 500000;
         await orderBook.initialize(
             router.address,
             vault.address,
             bnb.address,
             usdg.address,
-            executionGasLimit, 
-            gasPrice, // minGasPrice
+            minExecutionFee, 
             expandDecimals(5, 30) // minPurchseTokenAmountUsd
         );
 
@@ -128,8 +126,8 @@ describe("OrderBook", function () {
         return (name in obj) ? obj[name] : defaultValue;
     }
 
-    function defaultCreateIncreasePositionOrder(props = {}) {
-        return orderBook.connect(getDefault(props, 'user', defaults.user)).createIncreasePositionOrder(
+    function defaultCreateIncreaseOrder(props = {}) {
+        return orderBook.connect(getDefault(props, 'user', defaults.user)).createIncreaseOrder(
             getDefault(props, 'path', defaults.path),
             getDefault(props, 'amountIn', defaults.amountIn),
             getDefault(props, 'indexToken', defaults.path[defaults.path.length - 1]),
@@ -144,8 +142,8 @@ describe("OrderBook", function () {
         );
     }
 
-    function defaultCreateDecreasePositionOrder(props = {}) {
-        return orderBook.connect(getDefault(props, 'user', defaults.user)).createDecreasePositionOrder(
+    function defaultCreateDecreaseOrder(props = {}) {
+        return orderBook.connect(getDefault(props, 'user', defaults.user)).createDecreaseOrder(
             getDefault(props, 'indexToken', defaults.path[defaults.path.length - 1]),
             getDefault(props, 'sizeDelta', defaults.sizeDelta),
             getDefault(props, 'collateralToken', defaults.collateralToken),
@@ -187,9 +185,7 @@ describe("OrderBook", function () {
 
     it("set*", async() => {
         const cases = [
-            ['setExecutionGasLimit', 1],
-            ['setMinGasPrice', 1],
-            ['setMaxLeverage', 2],
+            ['setMinExecutionFee', 600000],
             ['setMinPurchaseTokenAmountUsd', 1]
         ];
         for (const [name, arg] of cases) {
@@ -205,7 +201,6 @@ describe("OrderBook", function () {
             bnb.address,
             usdg.address,
             1, 
-            1,
             expandDecimals(5, 30) // minPurchseTokenAmountUsd
         )).to.be.revertedWith("OrderBook: forbidden");
 
@@ -215,225 +210,378 @@ describe("OrderBook", function () {
             bnb.address,
             usdg.address,
             1, 
-            1,
             expandDecimals(5, 30) // minPurchseTokenAmountUsd
         )).to.be.revertedWith("OrderBook: already initialized");
     });
 
-    it("createIncreasePositionOrder, bad input", async () => {
-        const badExecutionFee = 100;
-        await expect(defaultCreateIncreasePositionOrder({
-            executionFee: badExecutionFee
-        })).to.be.revertedWith("OrderBook: insufficient execution fee");
+    describe("Increase position orders", () => {
+        it("createIncreaseOrder, bad input", async () => {
+            const badExecutionFee = 100;
+            await expect(defaultCreateIncreaseOrder({
+                executionFee: badExecutionFee
+            })).to.be.revertedWith("OrderBook: insufficient execution fee");
 
-        const goodExecutionFee = expandDecimals(1, 8);
-        await expect(defaultCreateIncreasePositionOrder({
-            executionFee: goodExecutionFee,
-            value: goodExecutionFee - 1
-        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+            const goodExecutionFee = expandDecimals(1, 8);
+            await expect(defaultCreateIncreaseOrder({
+                executionFee: goodExecutionFee,
+                value: goodExecutionFee - 1
+            })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
 
-        await expect(defaultCreateIncreasePositionOrder({
-            path: [bnb.address],
-            executionFee: goodExecutionFee,
-            value: expandDecimals(10, 8).add(goodExecutionFee).sub(1)
-        })).to.be.revertedWith("OrderBook: incorrect value transferred");
+            await expect(defaultCreateIncreaseOrder({
+                path: [bnb.address],
+                executionFee: goodExecutionFee,
+                value: expandDecimals(10, 8).add(goodExecutionFee).sub(1)
+            })).to.be.revertedWith("OrderBook: incorrect value transferred");
 
-        await expect(defaultCreateIncreasePositionOrder({
-            path: [dai.address],
-            amountIn: expandDecimals(4, 18)
-        })).to.be.revertedWith("OrderBook: insufficient collateral");
-
-        await expect(defaultCreateIncreasePositionOrder({
-            path: [dai.address],
-            amountIn: expandDecimals(10, 18),
-            indexToken: dai.address,
-            sizeDelta: expandDecimals(10001, 30)
-        })).to.be.revertedWith("OrderBook: leverage exceeded");
-    });
-
-    it("cancelOrder", async () => {
-        const bnbBalanceBefore = await defaults.user.getBalance();
-        const tokenBalanceBefore = await btc.balanceOf(defaults.user.address);
-        const tx1 = await defaultCreateIncreasePositionOrder();
-        let txFees = await getTxFees(tx1);
-
-        await expect(orderBook.connect(user1).cancelIncreaseOrder(defaults.user.address, 0)).to.be.revertedWith("OrderBook: forbidden");
-
-        const tx2 = await orderBook.connect(user0).cancelIncreaseOrder(defaults.user.address, 0);
-        txFees = txFees.add(await getTxFees(tx2));
-        const bnbBalanceAfter = await defaults.user.getBalance();
-        expect(bnbBalanceAfter, 'Before and after token balance are not equal')
-            .to.be.equal(bnbBalanceBefore.sub(txFees));
-
-        const tokenBalanceAfter = await btc.balanceOf(defaults.user.address);
-        expect(tokenBalanceAfter, "Before and after token balance are not equal").to.be.equal(tokenBalanceBefore);
-
-        const order = await getCreatedIncreaseOrder(defaults.user.address);
-        expect(order.account).to.be.equal(ZERO_ADDRESS);
-    });
-
-    it("cancelOrder, pay BNB", async () => {
-        const balanceBefore = await defaults.user.getBalance();
-        const bnbBalanceBefore = await bnb.balanceOf(orderBook.address);
-        const amountIn = expandDecimals(30, 18);
-        const value = defaults.executionFee.add(amountIn);
-        const tx1 = await defaultCreateIncreasePositionOrder({
-            path: [bnb.address],
-            amountIn,
-            value
-        });
-        let txFees = await getTxFees(tx1);
-
-        await expect(orderBook.connect(user1).cancelIncreaseOrder(defaults.user.address, 0)).to.be.revertedWith("OrderBook: forbidden");
-
-        const tx2 = await orderBook.connect(user0).cancelIncreaseOrder(defaults.user.address, 0);
-        txFees = txFees.add(await getTxFees(tx2));
-
-        const balanceAfter = await defaults.user.getBalance();
-        expect(balanceAfter, "Before and after balance are not equal").to.be.equal(balanceBefore.sub(txFees));
-
-        const order = await getCreatedIncreaseOrder(defaults.user.address);
-        expect(order.account).to.be.equal(ZERO_ADDRESS);
-    });
-
-    it("executeOrder, non-existent order", async () => {
-        await expect(orderBook.executeIncreaseOrder(user3.address, 0, user1.address)).to.be.revertedWith("OrderBook: non-existent order");
-    });
-
-    it("executeOrder, current price is invalid", async () => {
-        let orderIndex = 0;
-
-        await defaultCreateIncreasePositionOrder({triggerPrice: expandDecimals(BTC_PRICE + 1000, 30)});
-        const orderA = await orderBook.increaseOrders(defaults.user.address, orderIndex++);
-
-        await expect(orderBook.executeIncreaseOrder(orderA.account, orderA.index, user1.address))
-            .to.be.revertedWith("OrderBook: invalid price for execution");
-
-        await defaultCreateIncreasePositionOrder({
-            // TODO use setLatestAnswer instead
-            triggerPrice: expandDecimals(BTC_PRICE + 1000, 30),
-            isLong: false,
-            triggerAboveThreshold: true
-        });
-        const orderB = await orderBook.increaseOrders(defaults.user.address, orderIndex++);
-        await expect(orderBook.executeIncreaseOrder(orderB.account, orderB.index, user1.address))
-            .to.be.revertedWith("OrderBook: invalid price for execution");
-    });
-
-    it("executeOrder, long, purchase token same as collateral", async () => {
-        await defaultCreateIncreasePositionOrder();
-
-        const order = await orderBook.increaseOrders(defaults.user.address, 0);
-
-        const executorBalanceBefore = await user1.getBalance();
-        await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
-        const executorBalanceAfter = await user1.getBalance();
-        expect(executorBalanceAfter.gt(executorBalanceBefore)).to.be.true
-
-        const position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, defaults.isLong));
-        // TODO is it enough to check?
-        expect(position.size).to.be.equal(order.sizeDelta);
-
-        const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
-        expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
-    });
-
-    it("executeOrder, long, swap purchase token to collateral", async () => {
-        await defaultCreateIncreasePositionOrder({
-            path: [dai.address],
-            amountIn: expandDecimals(50000, 18)
+            await expect(defaultCreateIncreaseOrder({
+                path: [dai.address],
+                amountIn: expandDecimals(4, 18)
+            })).to.be.revertedWith("OrderBook: insufficient collateral");
         });
 
-        const order = await orderBook.increaseOrders(defaults.user.address, 0);
-        await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+        it("createIncreaseOrder, pay BNB", async () => {
+            const bnbBalanceBefore = await bnb.balanceOf(orderBook.address);
+            const amountIn = expandDecimals(30, 18);
+            const value = defaults.executionFee.add(amountIn);
+            const tx = await defaultCreateIncreaseOrder({
+                path: [bnb.address],
+                amountIn,
+                value
+            });
+            reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
 
-        const position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, defaults.isLong));
-        // TODO is it enough to check?
-        expect(position.size).to.be.equal(order.sizeDelta);
+            const order = await getCreatedIncreaseOrder(user0.address);
+            const bnbBalanceAfter = await bnb.balanceOf(orderBook.address);
 
-        const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
-        expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
-    });
+            const bnbBalanceDiff = bnbBalanceAfter.sub(bnbBalanceBefore);
+            expect(bnbBalanceDiff, 'BNB balance').to.be.equal(value);
 
-    it("executeOrder, short, purchase token same as collateral", async () => {
-        dai.mint(user0.address, expandDecimals(50000, 18));
-        await defaultCreateIncreasePositionOrder({
-            path: [dai.address],
-            collateralToken: dai.address,
-            isLong: false,
-            amountIn: expandDecimals(50000, 18),
-            triggerAboveThreshold: true,
-            // TODO use setLatestPrice
-            triggerPrice: expandDecimals(BTC_PRICE - 100, 30)
+            expect(order.account).to.be.equal(defaults.user.address);
+            expect(order.purchaseToken).to.be.equal(bnb.address);
+            expect(order.purchaseTokenAmount, 'purchaseTokenAmount').to.be.equal(amountIn);
+            expect(order.indexToken).to.be.equal(btc.address);
+            expect(order.sizeDelta, 'sizeDelta').to.be.equal(defaults.sizeDelta);
+            expect(order.isLong).to.be.true;
+            expect(order.triggerPrice, 'triggerPrice').to.be.equal(defaults.triggerPrice);
+            expect(order.triggerAboveThreshold).to.be.true;
+            expect(order.executionFee, 'executionFee').to.be.equal(defaults.executionFee);
         });
 
-        const order = await orderBook.increaseOrders(defaults.user.address, 0);
-        await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+        it("createIncreaseOrder, long A, transfer and purchase A", async () => {
+            const btcBalanceBefore = await btc.balanceOf(orderBook.address);
+            const tx = await defaultCreateIncreaseOrder();
+            reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
 
-        const position = positionWrapper(await vault.getPosition(user0.address, dai.address, btc.address, false));
-        // TODO is it enough to check?
-        expect(position.size, 'position.size').to.be.equal(order.sizeDelta);
+            const order = await getCreatedIncreaseOrder(user0.address);
+            const btcBalanceAfter = await btc.balanceOf(orderBook.address);
 
-        const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
-        expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
-    });
+            expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
+            expect(btcBalanceAfter.sub(btcBalanceBefore), 'BTC balance').to.be.equal(defaults.amountIn);
 
-    it("executeOrder, short, swap purchase token to collateral", async () => {
-        await defaultCreateIncreasePositionOrder({
-            isLong: false,
-            collateralToken: dai.address,
-            triggerAboveThreshold: true,
-            // TODO use setLatestPrice
-            triggerPrice: expandDecimals(BTC_PRICE - 100, 30)
+            expect(order.account).to.be.equal(defaults.user.address);
+            expect(order.purchaseToken).to.be.equal(btc.address);
+            expect(order.purchaseTokenAmount).to.be.equal(defaults.amountIn);
+            expect(order.indexToken).to.be.equal(btc.address);
+            expect(order.sizeDelta).to.be.equal(defaults.sizeDelta);
+            expect(order.isLong).to.be.true;
+            expect(order.triggerPrice).to.be.equal(defaults.triggerPrice);
+            expect(order.triggerAboveThreshold).to.be.true;
+            expect(order.executionFee).to.be.equal(defaults.executionFee);
         });
 
-        const order = await orderBook.increaseOrders(defaults.user.address, 0);
-        await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+        it("createIncreaseOrder, long A, transfer A, purchase B", async () => {
+            const daiBalanceBefore = await dai.balanceOf(orderBook.address);
+            const tx = await defaultCreateIncreaseOrder({
+                path: [btc.address, dai.address]
+            });
+            reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
+            const daiBalanceAfter = await dai.balanceOf(orderBook.address);
+            const order = await getCreatedIncreaseOrder(defaults.user.address);
 
-        const position = positionWrapper(await vault.getPosition(user0.address, dai.address, btc.address, false));
-        // TODO is it enough to check?
-        expect(position.size, 'position.size').to.be.equal(order.sizeDelta);
+            expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
+            // Q: is it ok to compare with gt and compare to *0.98? To consider fees
+            expect(daiBalanceAfter.sub(daiBalanceBefore).gt(defaults.amountIn.mul(BTC_PRICE).mul(98).div(100))).to.be.true;
 
-        const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
-        expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
-    });
-
-    it("executeOrder, short, pay BNB, no swap", async () => {
-        const amountIn = expandDecimals(50, 18);
-        const value = defaults.executionFee.add(amountIn)
-        await defaultCreateIncreasePositionOrder({
-            path: [bnb.address],
-            amountIn,
-            value,
-            indexToken: bnb.address,
-            collateralToken: dai.address,
-            isLong: false,
-            triggerboveThreshold: true,
-            // TODO use setLatestPrice
-            triggerPrice: expandDecimals(BNB_PRICE - 10, 30)
+            expect(order.account).to.be.equal(defaults.user.address);
+            expect(order.purchaseToken, 'purchaseToken').to.be.equal(dai.address);
+            expect(order.purchaseTokenAmount, 'purchaseTokenAmount').to.be.above(expandDecimals(BTC_PRICE * 0.99, 18));
+            expect(order.indexToken, 'indexToken').to.be.equal(btc.address);
+            expect(order.sizeDelta, 'sizeDelta').to.be.equal(defaults.sizeDelta);
+            expect(order.isLong, 'isLong').to.be.true;
+            expect(order.triggerPrice, 'triggerPrice').to.be.equal(defaults.triggerPrice);
+            expect(order.triggerAboveThreshold, 'triggerAboveThreshold').to.be.true;
+            expect(order.executionFee, 'executionFee').to.be.equal(defaults.executionFee);
         });
 
-        const order = await orderBook.increaseOrders(defaults.user.address, 0);
-        await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+        it("createIncreaseOrder, short A, transfer B, purchase B", async () => {
+            const daiBalanceBefore = await dai.balanceOf(orderBook.address);
+            const amountIn = expandDecimals(30000, 18);
+            const tx = await defaultCreateIncreaseOrder({
+                path: [dai.address],
+                amountIn,
+                isLong: false,
+                triggerAboveThreshold: true
+            });
+            reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
+            const daiBalanceAfter = await dai.balanceOf(orderBook.address);
 
-        const position = positionWrapper(await vault.getPosition(user0.address, dai.address, bnb.address, false));
-        // TODO is it enough to check?
-        expect(position.size, 'position.size').to.be.equal(order.sizeDelta);
+            const order = await getCreatedIncreaseOrder(defaults.user.address);
+            expect(await bnb.balanceOf(orderBook.address)).to.be.equal(defaults.executionFee);
+            expect(daiBalanceAfter.sub(daiBalanceBefore), 'DAI balance').to.be.equal(amountIn);
 
-        const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
-        expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
+            expect(order.account).to.be.equal(defaults.user.address);
+            expect(order.purchaseToken).to.be.equal(dai.address);
+            expect(order.indexToken).to.be.equal(btc.address);
+            expect(order.sizeDelta).to.be.equal(defaults.sizeDelta);
+            expect(order.purchaseTokenAmount).to.be.equal(amountIn);
+            expect(order.isLong).to.be.false;
+            expect(order.triggerPrice).to.be.equal(defaults.triggerPrice);
+            expect(order.triggerAboveThreshold).to.be.true;
+            expect(order.executionFee).to.be.equal(defaults.executionFee);
+        });
+
+        it("createIncreaseOrder, short A, transfer A, purchase B", async () => {
+            const daiBalanceBefore = await dai.balanceOf(orderBook.address);
+            const tx = await defaultCreateIncreaseOrder({
+                path: [btc.address, dai.address],
+                isLong: false,
+                triggerAboveThreshold: true
+            });
+            reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
+            const daiBalanceAfter = await dai.balanceOf(orderBook.address);
+
+            const order = await getCreatedIncreaseOrder(defaults.user.address);
+
+            expect(await bnb.balanceOf(orderBook.address)).to.be.equal(defaults.executionFee);
+            // TODO
+            // Q: is it ok to compare with gt and compare to *0.98? To consider fees
+            expect(daiBalanceAfter.sub(daiBalanceBefore).gt(defaults.amountIn.mul(BTC_PRICE).mul(98).div(100))).to.be.true;
+
+            expect(order.account).to.be.equal(defaults.user.address);
+            expect(order.purchaseToken).to.be.equal(dai.address);
+            expect(order.indexToken).to.be.equal(btc.address);
+            expect(order.sizeDelta).to.be.equal(defaults.sizeDelta);
+            expect(order.purchaseTokenAmount).to.be.above(expandDecimals(BTC_PRICE * 0.99, 18));
+            expect(order.isLong).to.be.false;
+            expect(order.triggerPrice).to.be.equal(defaults.triggerPrice);
+            expect(order.triggerAboveThreshold).to.be.true;
+            expect(order.executionFee).to.be.equal(defaults.executionFee);
+        });
+
+        it("updateIncreaseOrder", async () => {
+            await defaultCreateIncreaseOrder();
+
+            const newSizeDelta = defaults.sizeDelta.add(100);
+            const newTriggerPrice = defaults.triggerPrice.add(100);
+            const newTriggerAboveThreshold = !defaults.triggerAboveThreshold;
+
+            await expect(orderBook.connect(user1).updateIncreaseOrder(0, newSizeDelta, newTriggerPrice, newTriggerAboveThreshold))
+                .to.be.revertedWith("OrderBook: non-existent order");
+
+            const tx = await orderBook.connect(user0).updateIncreaseOrder(0, newSizeDelta, newTriggerPrice, newTriggerAboveThreshold);
+            reportGasUsed(provider, tx, 'updateIncreaseOrder gas used');
+
+            order = await getCreatedIncreaseOrder(user0.address);
+            expect(order.sizeDelta).to.be.equal(newSizeDelta);
+            expect(order.triggerPrice).to.be.equal(newTriggerPrice);
+            expect(order.triggerAboveThreshold).to.be.equal(newTriggerAboveThreshold);
+        });
+
+        it("cancelOrder", async () => {
+            const bnbBalanceBefore = await defaults.user.getBalance();
+            const tokenBalanceBefore = await btc.balanceOf(defaults.user.address);
+            const tx1 = await defaultCreateIncreaseOrder();
+            let txFees = await getTxFees(tx1);
+
+            await expect(orderBook.connect(user1).cancelIncreaseOrder(0)).to.be.revertedWith("OrderBook: non-existent order");
+
+            const tx2 = await orderBook.connect(user0).cancelIncreaseOrder(0);
+            reportGasUsed(provider, tx2, 'cancelIncreaseOrder gas used');
+
+            txFees = txFees.add(await getTxFees(tx2));
+            const bnbBalanceAfter = await defaults.user.getBalance();
+            expect(bnbBalanceAfter, 'Before and after token balance are not equal')
+                .to.be.equal(bnbBalanceBefore.sub(txFees));
+
+            const tokenBalanceAfter = await btc.balanceOf(defaults.user.address);
+            expect(tokenBalanceAfter, "Before and after token balance are not equal").to.be.equal(tokenBalanceBefore);
+
+            const order = await getCreatedIncreaseOrder(defaults.user.address);
+            expect(order.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("cancelOrder, pay BNB", async () => {
+            const balanceBefore = await defaults.user.getBalance();
+            const bnbBalanceBefore = await bnb.balanceOf(orderBook.address);
+            const amountIn = expandDecimals(30, 18);
+            const value = defaults.executionFee.add(amountIn);
+            const tx1 = await defaultCreateIncreaseOrder({
+                path: [bnb.address],
+                amountIn,
+                value
+            });
+            let txFees = await getTxFees(tx1);
+
+            await expect(orderBook.connect(user1).cancelIncreaseOrder(0)).to.be.revertedWith("OrderBook: non-existent order");
+
+            const tx2 = await orderBook.connect(user0).cancelIncreaseOrder(0);
+            reportGasUsed(provider, tx2, 'cancelIncreaseOrder gas used');
+            txFees = txFees.add(await getTxFees(tx2));
+
+            const balanceAfter = await defaults.user.getBalance();
+            expect(balanceAfter, "Before and after balance are not equal").to.be.equal(balanceBefore.sub(txFees));
+
+            const order = await getCreatedIncreaseOrder(defaults.user.address);
+            expect(order.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("executeOrder, non-existent order", async () => {
+            await expect(orderBook.executeIncreaseOrder(user3.address, 0, user1.address)).to.be.revertedWith("OrderBook: non-existent order");
+        });
+
+        it("executeOrder, current price is invalid", async () => {
+            let orderIndex = 0;
+
+            await defaultCreateIncreaseOrder({triggerPrice: expandDecimals(BTC_PRICE + 1000, 30)});
+            const orderA = await orderBook.increaseOrders(defaults.user.address, orderIndex++);
+
+            await expect(orderBook.executeIncreaseOrder(orderA.account, orderA.index, user1.address))
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+
+            await defaultCreateIncreaseOrder({
+                // TODO use setLatestAnswer instead
+                triggerPrice: expandDecimals(BTC_PRICE + 1000, 30),
+                isLong: false,
+                triggerAboveThreshold: true
+            });
+            const orderB = await orderBook.increaseOrders(defaults.user.address, orderIndex++);
+            await expect(orderBook.executeIncreaseOrder(orderB.account, orderB.index, user1.address))
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+        });
+
+        it("executeOrder, long, purchase token same as collateral", async () => {
+            await defaultCreateIncreaseOrder();
+
+            const order = await orderBook.increaseOrders(defaults.user.address, 0);
+
+            const executorBalanceBefore = await user1.getBalance();
+            const tx = await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeIncreaseOrder gas used');
+
+            const executorBalanceAfter = await user1.getBalance();
+            expect(executorBalanceAfter.gt(executorBalanceBefore)).to.be.true
+
+            const position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, defaults.isLong));
+            // TODO is it enough to check?
+            expect(position.size).to.be.equal(order.sizeDelta);
+
+            const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
+            expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("executeOrder, long, swap purchase token to collateral", async () => {
+            await defaultCreateIncreaseOrder({
+                path: [dai.address],
+                amountIn: expandDecimals(50000, 18)
+            });
+
+            const order = await orderBook.increaseOrders(defaults.user.address, 0);
+            const tx = await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeIncreaseOrder gas used');
+
+            const position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, defaults.isLong));
+            // TODO is it enough to check?
+            expect(position.size).to.be.equal(order.sizeDelta);
+
+            const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
+            expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("executeOrder, short, purchase token same as collateral", async () => {
+            dai.mint(user0.address, expandDecimals(50000, 18));
+            await defaultCreateIncreaseOrder({
+                path: [dai.address],
+                collateralToken: dai.address,
+                isLong: false,
+                amountIn: expandDecimals(50000, 18),
+                triggerAboveThreshold: true,
+                // TODO use setLatestPrice
+                triggerPrice: expandDecimals(BTC_PRICE - 100, 30)
+            });
+
+            const order = await orderBook.increaseOrders(defaults.user.address, 0);
+            const tx = await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeIncreaseOrder gas used');
+
+            const position = positionWrapper(await vault.getPosition(user0.address, dai.address, btc.address, false));
+            // TODO is it enough to check?
+            expect(position.size, 'position.size').to.be.equal(order.sizeDelta);
+
+            const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
+            expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("executeOrder, short, swap purchase token to collateral", async () => {
+            await defaultCreateIncreaseOrder({
+                isLong: false,
+                collateralToken: dai.address,
+                triggerAboveThreshold: true,
+                // TODO use setLatestPrice
+                triggerPrice: expandDecimals(BTC_PRICE - 100, 30)
+            });
+
+            const order = await orderBook.increaseOrders(defaults.user.address, 0);
+            const tx = await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeIncreaseOrder gas used');
+
+            const position = positionWrapper(await vault.getPosition(user0.address, dai.address, btc.address, false));
+            // TODO is it enough to check?
+            expect(position.size, 'position.size').to.be.equal(order.sizeDelta);
+
+            const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
+            expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("executeOrder, short, pay BNB, no swap", async () => {
+            const amountIn = expandDecimals(50, 18);
+            const value = defaults.executionFee.add(amountIn)
+            await defaultCreateIncreaseOrder({
+                path: [bnb.address],
+                amountIn,
+                value,
+                indexToken: bnb.address,
+                collateralToken: dai.address,
+                isLong: false,
+                triggerboveThreshold: true,
+                // TODO use setLatestPrice
+                triggerPrice: expandDecimals(BNB_PRICE - 10, 30)
+            });
+
+            const order = await orderBook.increaseOrders(defaults.user.address, 0);
+            const tx = await orderBook.executeIncreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeIncreaseOrder gas used');
+
+            const position = positionWrapper(await vault.getPosition(user0.address, dai.address, bnb.address, false));
+            // TODO is it enough to check?
+            expect(position.size, 'position.size').to.be.equal(order.sizeDelta);
+
+            const orderAfter = await orderBook.increaseOrders(defaults.user.address, 0);
+            expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("createIncreaseOrder, bad path", async () => {
+            await expect(defaultCreateIncreaseOrder({
+                path: [btc.address, btc.address]
+            })).to.be.revertedWith("OrderBook: invalid _path");
+        });
+
     });
 
-    it("createIncreasePositionOrder, bad path", async () => {
-        await expect(defaultCreateIncreasePositionOrder({
-            path: [btc.address, btc.address]
-        })).to.be.revertedWith("OrderBook: invalid _path");
-    });
-
-    describe("Decrease position", () => {
+    describe("Decrease position orders", () => {
         it("Create decrease order, long", async () => {
-            await defaultCreateDecreasePositionOrder();
-            const order = await getCreatedDecreaseOrder(user0.address);
+            const tx = await defaultCreateDecreaseOrder();
+            reportGasUsed(provider, tx, 'createDecraseOrder gas used');
+            let order = await getCreatedDecreaseOrder(user0.address);
             const btcBalanceAfter = await btc.balanceOf(orderBook.address);
 
             expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
@@ -449,10 +597,35 @@ describe("OrderBook", function () {
             expect(order.executionFee).to.be.equal(defaults.executionFee);
         });
 
+        it("updateDecreaseOrder", async () => {
+            await defaultCreateDecreaseOrder();
+
+            const newSizeDelta = defaults.sizeDelta.add(100);
+            const newTriggerPrice = defaults.triggerPrice.add(100);
+            const newTriggerAboveThreshold = !defaults.triggerAboveThreshold;
+            const newCollateralDelta = defaults.collateralDelta.add(100);
+
+            await expect(orderBook.connect(user1).updateDecreaseOrder(
+                0, newCollateralDelta, newSizeDelta, newTriggerPrice, newTriggerAboveThreshold
+            )).to.be.revertedWith("OrderBook: non-existent order");
+
+            const tx2 = await orderBook.connect(user0).updateDecreaseOrder(
+                0, newCollateralDelta, newSizeDelta, newTriggerPrice, newTriggerAboveThreshold
+            );
+            reportGasUsed(provider, tx2, 'updateDecreaseOrder gas used');
+
+            order = await getCreatedDecreaseOrder(user0.address);
+            expect(order.sizeDelta).to.be.equal(newSizeDelta);
+            expect(order.collateralDelta).to.be.equal(newCollateralDelta);
+            expect(order.triggerPrice).to.be.equal(newTriggerPrice);
+            expect(order.triggerAboveThreshold).to.be.equal(newTriggerAboveThreshold);
+        });
+
         it("Create decrease order, short", async () => {
-            await defaultCreateDecreasePositionOrder({
+            const tx = await defaultCreateDecreaseOrder({
                 isLong: false
             });
+            reportGasUsed(provider, tx, 'createDecreaseOrder gas used');
             const order = await getCreatedDecreaseOrder(user0.address);
             const btcBalanceAfter = await btc.balanceOf(orderBook.address);
 
@@ -476,7 +649,7 @@ describe("OrderBook", function () {
             const btcBalanceBefore = await btc.balanceOf(user0.address);
             let position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, true));
 
-            await defaultCreateDecreasePositionOrder({
+            await defaultCreateDecreaseOrder({
                 collateralDelta: position.collateral,
                 sizeDelta: position.size,
                 triggerAboveThreshold: true,
@@ -489,7 +662,9 @@ describe("OrderBook", function () {
             await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE + 5050));
 
             const executorBalanceBefore = await user1.getBalance();
-            await orderBook.executeDecreaseOrder(defaults.user.address, 0, user1.address);
+            const tx = await orderBook.executeDecreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeDecreaseOrder gas used');
+
             const executorBalanceAfter = await user1.getBalance();
             expect(executorBalanceAfter).to.be.equal(executorBalanceBefore.add(defaults.executionFee));
 
@@ -512,7 +687,7 @@ describe("OrderBook", function () {
             let position = positionWrapper(await vault.getPosition(user0.address, dai.address, btc.address, false));
             const daiBalanceBefore = await dai.balanceOf(user0.address);
 
-            await defaultCreateDecreasePositionOrder({
+            await defaultCreateDecreaseOrder({
                 collateralDelta: position.collateral,
                 collateralToken: dai.address,
                 sizeDelta: position.size,
@@ -526,7 +701,9 @@ describe("OrderBook", function () {
             await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE - 1500));
 
             const executorBalanceBefore = await user1.getBalance();
-            await orderBook.executeDecreaseOrder(defaults.user.address, 0, user1.address);
+            const tx = await orderBook.executeDecreaseOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeDecreaseOrder gas used');
+
             const executorBalanceAfter = await user1.getBalance();
             expect(executorBalanceAfter.gt(executorBalanceBefore)).to.be.true
 
@@ -542,130 +719,20 @@ describe("OrderBook", function () {
             expect(orderAfter.account).to.be.equal(ZERO_ADDRESS);
         });
 
-        // TODO cancel decrease order
+        // TODO executeDecreaseOrder if collateralToken == weth
+
+        it("Cancel decrease order", async () => {
+            await defaultCreateDecreaseOrder();
+            let order = await getCreatedDecreaseOrder(user0.address);
+            expect(order.account).to.not.be.equal(ZERO_ADDRESS);
+
+            const tx = await orderBook.connect(user0).cancelDecreaseOrder(0);
+            reportGasUsed(provider, tx, 'cancelDecreaseOrder gas used');
+            order = await getCreatedDecreaseOrder(user0.address);
+            expect(order.account).to.be.equal(ZERO_ADDRESS);
+        });
     })
-
-    it("createIncreasePositionOrder, pay BNB", async () => {
-        const bnbBalanceBefore = await bnb.balanceOf(orderBook.address);
-        const amountIn = expandDecimals(30, 18);
-        const value = defaults.executionFee.add(amountIn);
-        await defaultCreateIncreasePositionOrder({
-            path: [bnb.address],
-            amountIn,
-            value
-        });
-        const order = await getCreatedIncreaseOrder(user0.address);
-        const bnbBalanceAfter = await bnb.balanceOf(orderBook.address);
-
-        const bnbBalanceDiff = bnbBalanceAfter.sub(bnbBalanceBefore);
-        expect(bnbBalanceDiff, 'BNB balance').to.be.equal(value);
-
-        expect(order.account).to.be.equal(defaults.user.address);
-        expect(order.purchaseToken).to.be.equal(bnb.address);
-        expect(order.purchaseTokenAmount, 'purchaseTokenAmount').to.be.equal(amountIn);
-        expect(order.indexToken).to.be.equal(btc.address);
-        expect(order.sizeDelta, 'sizeDelta').to.be.equal(defaults.sizeDelta);
-        expect(order.isLong).to.be.true;
-        expect(order.triggerPrice, 'triggerPrice').to.be.equal(defaults.triggerPrice);
-        expect(order.triggerAboveThreshold).to.be.true;
-        expect(order.executionFee, 'executionFee').to.be.equal(defaults.executionFee);
-    });
-
-    it("createIncreasePositionOrder, long A, transfer and purchase A", async () => {
-        const btcBalanceBefore = await btc.balanceOf(orderBook.address);
-        await defaultCreateIncreasePositionOrder();
-        const order = await getCreatedIncreaseOrder(user0.address);
-        const btcBalanceAfter = await btc.balanceOf(orderBook.address);
-
-        expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
-        expect(btcBalanceAfter.sub(btcBalanceBefore), 'BTC balance').to.be.equal(defaults.amountIn);
-
-        expect(order.account).to.be.equal(defaults.user.address);
-        expect(order.purchaseToken).to.be.equal(btc.address);
-        expect(order.purchaseTokenAmount).to.be.equal(defaults.amountIn);
-        expect(order.indexToken).to.be.equal(btc.address);
-        expect(order.sizeDelta).to.be.equal(defaults.sizeDelta);
-        expect(order.isLong).to.be.true;
-        expect(order.triggerPrice).to.be.equal(defaults.triggerPrice);
-        expect(order.triggerAboveThreshold).to.be.true;
-        expect(order.executionFee).to.be.equal(defaults.executionFee);
-    });
-
-    it("createIncreasePositionOrder, long A, transfer A, purchase B", async () => {
-        const daiBalanceBefore = await dai.balanceOf(orderBook.address);
-        await defaultCreateIncreasePositionOrder({
-            path: [btc.address, dai.address]
-        });
-        const daiBalanceAfter = await dai.balanceOf(orderBook.address);
-        const order = await getCreatedIncreaseOrder(defaults.user.address);
-
-        expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
-        // Q: is it ok to compare with gt and compare to *0.98? To consider fees
-        expect(daiBalanceAfter.sub(daiBalanceBefore).gt(defaults.amountIn.mul(BTC_PRICE).mul(98).div(100))).to.be.true;
-
-        expect(order.account).to.be.equal(defaults.user.address);
-        expect(order.purchaseToken, 'purchaseToken').to.be.equal(dai.address);
-        expect(order.purchaseTokenAmount, 'purchaseTokenAmount').to.be.above(expandDecimals(BTC_PRICE * 0.99, 18));
-        expect(order.indexToken, 'indexToken').to.be.equal(btc.address);
-        expect(order.sizeDelta, 'sizeDelta').to.be.equal(defaults.sizeDelta);
-        expect(order.isLong, 'isLong').to.be.true;
-        expect(order.triggerPrice, 'triggerPrice').to.be.equal(defaults.triggerPrice);
-        expect(order.triggerAboveThreshold, 'triggerAboveThreshold').to.be.true;
-        expect(order.executionFee, 'executionFee').to.be.equal(defaults.executionFee);
-    });
-
-    it("createIncreasePositionOrder, short A, transfer B, purchase B", async () => {
-        const daiBalanceBefore = await dai.balanceOf(orderBook.address);
-        const amountIn = expandDecimals(30000, 18);
-        await defaultCreateIncreasePositionOrder({
-            path: [dai.address],
-            amountIn,
-            isLong: false,
-            triggerAboveThreshold: true
-        });
-        const daiBalanceAfter = await dai.balanceOf(orderBook.address);
-
-        const order = await getCreatedIncreaseOrder(defaults.user.address);
-        expect(await bnb.balanceOf(orderBook.address)).to.be.equal(defaults.executionFee);
-        expect(daiBalanceAfter.sub(daiBalanceBefore), 'DAI balance').to.be.equal(amountIn);
-
-        expect(order.account).to.be.equal(defaults.user.address);
-        expect(order.purchaseToken).to.be.equal(dai.address);
-        expect(order.indexToken).to.be.equal(btc.address);
-        expect(order.sizeDelta).to.be.equal(defaults.sizeDelta);
-        expect(order.purchaseTokenAmount).to.be.equal(amountIn);
-        expect(order.isLong).to.be.false;
-        expect(order.triggerPrice).to.be.equal(defaults.triggerPrice);
-        expect(order.triggerAboveThreshold).to.be.true;
-        expect(order.executionFee).to.be.equal(defaults.executionFee);
-    });
-
-    it("createIncreasePositionOrder, short A, transfer A, purchase B", async () => {
-        const daiBalanceBefore = await dai.balanceOf(orderBook.address);
-        await defaultCreateIncreasePositionOrder({
-            path: [btc.address, dai.address],
-            isLong: false,
-            triggerAboveThreshold: true
-        });
-        const daiBalanceAfter = await dai.balanceOf(orderBook.address);
-
-        const order = await getCreatedIncreaseOrder(defaults.user.address);
-
-        expect(await bnb.balanceOf(orderBook.address)).to.be.equal(defaults.executionFee);
-        // TODO
-        // Q: is it ok to compare with gt and compare to *0.98? To consider fees
-        expect(daiBalanceAfter.sub(daiBalanceBefore).gt(defaults.amountIn.mul(BTC_PRICE).mul(98).div(100))).to.be.true;
-
-        expect(order.account).to.be.equal(defaults.user.address);
-        expect(order.purchaseToken).to.be.equal(dai.address);
-        expect(order.indexToken).to.be.equal(btc.address);
-        expect(order.sizeDelta).to.be.equal(defaults.sizeDelta);
-        expect(order.purchaseTokenAmount).to.be.above(expandDecimals(BTC_PRICE * 0.99, 18));
-        expect(order.isLong).to.be.false;
-        expect(order.triggerPrice).to.be.equal(defaults.triggerPrice);
-        expect(order.triggerAboveThreshold).to.be.true;
-        expect(order.executionFee).to.be.equal(defaults.executionFee);
-    });
+;
 });
 
 
