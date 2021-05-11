@@ -11,6 +11,7 @@ use(solidity)
 const BTC_PRICE = 60000;
 const BNB_PRICE = 300;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const PRICE_PRECISION = ethers.BigNumber.from(10).pow(30);
 
 describe("OrderBook", function () {
     const provider = waffle.provider
@@ -84,31 +85,34 @@ describe("OrderBook", function () {
         await router.addPlugin(orderBook.address);
         await router.connect(user0).approvePlugin(orderBook.address);
 
-        await btc.mint(user0.address, expandDecimals(100, 8))
+        await btc.mint(user0.address, expandDecimals(1000, 8))
         await btc.connect(user0).approve(router.address, expandDecimals(100, 8))
 
-        await dai.mint(user0.address, expandDecimals(1000000, 18))
+        await dai.mint(user0.address, expandDecimals(10000000, 18))
         await dai.connect(user0).approve(router.address, expandDecimals(1000000, 18))
 
-        await dai.mint(user0.address, expandDecimals(2000000, 18))
+        await dai.mint(user0.address, expandDecimals(20000000, 18))
         await dai.connect(user0).transfer(vault.address, expandDecimals(2000000, 18))
         await vault.directPoolDeposit(dai.address);
 
-        await btc.mint(user0.address, expandDecimals(100, 8))
+        await btc.mint(user0.address, expandDecimals(1000, 8))
         await btc.connect(user0).transfer(vault.address, expandDecimals(100, 8))
         await vault.directPoolDeposit(btc.address);
 
         defaults = {
             path: [btc.address],
+            swapPath: [dai.address, btc.address],
             sizeDelta: toUsd(100000),
             amountIn: expandDecimals(1, 8),
+            swapAmountIn: expandDecimals(1000, 18),
             triggerPrice: toUsd(53000),
             triggerAboveThreshold: true,
             executionFee: expandDecimals(1, 9).mul(1500000),
             collateralToken: btc.address,
             collateralDelta: toUsd(BTC_PRICE),
             user: user0,
-            isLong: true
+            isLong: true,
+            minOut: 1
         };
     })
 
@@ -126,12 +130,27 @@ describe("OrderBook", function () {
         return (name in obj) ? obj[name] : defaultValue;
     }
 
+    // TODO test minOut of all methods
+
+    function defaultCreateSwapOrder(props = {}) {
+        if (!('triggerRatio' in props)) throw new Error('triggerRatio is not provided');
+        return orderBook.connect(getDefault(props, 'user', defaults.user)).createSwapOrder(
+            getDefault(props, 'path', defaults.swapPath),
+            getDefault(props, 'amountIn', defaults.swapAmountIn),
+            getDefault(props, 'minOut', defaults.minOut),
+            props.triggerRatio,
+            getDefault(props, 'triggerAboveThreshold', defaults.triggerAboveThreshold),
+            getDefault(props, 'executionFee', defaults.executionFee),
+            {value: getDefault(props, 'value', props.executionFee || defaults.executionFee)}
+        );
+    }
+
     function defaultCreateIncreaseOrder(props = {}) {
         return orderBook.connect(getDefault(props, 'user', defaults.user)).createIncreaseOrder(
             getDefault(props, 'path', defaults.path),
             getDefault(props, 'amountIn', defaults.amountIn),
             getDefault(props, 'indexToken', defaults.path[defaults.path.length - 1]),
-            getDefault(props, 'minOut', 0),
+            getDefault(props, 'minOut', defaults.minOut),
             getDefault(props, 'sizeDelta', defaults.sizeDelta),
             getDefault(props, 'collateralToken', defaults.collateralToken), // _collateralToken
             getDefault(props, 'isLong', defaults.isLong),
@@ -156,9 +175,28 @@ describe("OrderBook", function () {
         );
     }
 
+    function validateOrderFields(order, fields) {
+        for (const [key, value] of Object.entries(fields)) {
+            if (key === 'path') {
+                order.path.forEach((item, index) => {
+                    expect(item, key).to.be.equal(value[index]);
+                });
+                return;
+            }
+            if (value === true) return expect(order[key], key).to.be.true;
+            if (value === false) return expect(order[key], key).to.be.false;
+            expect(order[key], key).to.be.equal(value)
+        }
+    }
+
     async function getTxFees(tx) {
         const receipt = await provider.getTransactionReceipt(tx.hash);
         return tx.gasPrice.mul(receipt.gasUsed);
+    }
+
+    async function getCreatedSwapOrder(address, orderIndex = 0) {
+        const order = await orderBook.swapOrders(address, orderIndex);
+        return order;
     }
 
     async function getCreatedIncreaseOrder(address, orderIndex = 0) {
@@ -213,6 +251,298 @@ describe("OrderBook", function () {
             expandDecimals(5, 30) // minPurchseTokenAmountUsd
         )).to.be.revertedWith("OrderBook: already initialized");
     });
+
+    describe("Swap orders", () => {
+        it("createSwapOrder, bad input", async () => {
+            await expect(defaultCreateSwapOrder({
+                path: [btc.address],
+                triggerRatio: 1
+            }), 1).to.be.revertedWith("OrderBook: invalid _path.length");
+
+            await expect(defaultCreateSwapOrder({
+                path: [btc.address, btc.address, dai.address, dai.address],
+                triggerRatio: 1
+            }), 2).to.be.revertedWith("OrderBook: invalid _path.length");
+
+            await expect(defaultCreateSwapOrder({
+                path: [btc.address, btc.address],
+                triggerRatio: 1
+            }), 3).to.be.revertedWith("OrderBook: invalid _path");
+
+            await expect(defaultCreateSwapOrder({
+                path: [dai.address, btc.address],
+                triggerRatio: 1,
+                executionFee: 100
+            }), 4).to.be.revertedWith("OrderBook: insufficient execution fee");
+
+            await expect(defaultCreateSwapOrder({
+                path: [dai.address, btc.address],
+                triggerRatio: 1,
+                value: 100
+            }), 5).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+        });
+
+        it("createSwapOrder, DAI -> BTC", async () => {
+            const triggerRatio = toUsd(1).mul(PRICE_PRECISION).div(toUsd(58000));
+            const tx = await defaultCreateSwapOrder({
+                triggerRatio,
+                triggerAboveThreshold: false
+            });
+            reportGasUsed(provider, tx, "createSwapOrder");
+            const daiBalance = await dai.balanceOf(orderBook.address);
+            expect(daiBalance).to.be.equal(defaults.swapAmountIn);
+            const bnbBalance = await bnb.balanceOf(orderBook.address);
+            expect(bnbBalance).to.be.equal(defaults.executionFee);
+
+            const order = await getCreatedSwapOrder(defaults.user.address);
+
+            validateOrderFields(order, {
+                account: defaults.user.address,
+                triggerRatio,
+                triggerAboveThreshold: false,
+                path: [dai.address, btc.address],
+                minOut: defaults.minOut,
+                amountIn: defaults.swapAmountIn,
+                executionFee: defaults.executionFee
+            });
+        });
+
+        it("createSwapOrder, BNB -> DAI", async () => {
+            const triggerRatio = toUsd(1).mul(PRICE_PRECISION).div(toUsd(550));
+            const amountIn = expandDecimals(10, 18);
+            const value = defaults.executionFee.add(amountIn);
+            const tx = await defaultCreateSwapOrder({
+                path: [bnb.address, dai.address],
+                triggerRatio,
+                triggerAboveThreshold: false,
+                amountIn,
+                value
+            });
+            reportGasUsed(provider, tx, "createSwapOrder");
+            const bnbBalance = await bnb.balanceOf(orderBook.address);
+            expect(bnbBalance).to.be.equal(value);
+
+            const order = await getCreatedSwapOrder(defaults.user.address);
+
+            validateOrderFields(order, {
+                account: defaults.user.address,
+                triggerRatio,
+                triggerAboveThreshold: false,
+                path: [dai.address, btc.address],
+                minOut: defaults.minOut,
+                executionFee: defaults.executionFee,
+                amountIn
+            });
+        });
+
+        it("createSwapOrder, two orders", async () => {
+            const triggerRatio1 = toUsd(1).mul(PRICE_PRECISION).div(toUsd(58000));
+            const tx1 = await defaultCreateSwapOrder({triggerRatio: triggerRatio1});
+            reportGasUsed(provider, tx1, 'createSwapOrder');
+            const triggerRatio2 = toUsd(1).mul(PRICE_PRECISION).div(toUsd(59000));
+            const tx2 = await defaultCreateSwapOrder({triggerRatio: triggerRatio2});
+            reportGasUsed(provider, tx2, 'createSwapOrder');
+
+            const order1 = await getCreatedSwapOrder(defaults.user.address, 0);
+            const order2 = await getCreatedSwapOrder(defaults.user.address, 1);
+
+            expect(order1.account).to.be.equal(defaults.user.address);
+            expect(order1.triggerRatio).to.be.equal(triggerRatio1);
+
+            expect(order2.account).to.be.equal(defaults.user.address);
+            expect(order2.triggerRatio).to.be.equal(triggerRatio2);
+        });
+
+        it("cancelSwapOrder, tokenA != BNB", async () => {
+            const triggerRatio = toUsd(58000).mul(PRICE_PRECISION).div(toUsd(1));
+            await defaultCreateSwapOrder({
+                triggerRatio,
+                triggerAboveThreshold: false
+            });
+
+            const balanceBefore = await defaults.user.getBalance();
+            const daiBalanceBefore = await dai.balanceOf(defaults.user.address)
+
+            const tx = await orderBook.connect(defaults.user).cancelSwapOrder(0);
+            reportGasUsed(provider, tx, "canceSwapOrder");
+            const txFees = await getTxFees(tx);
+
+            const balanceAfter = await user0.getBalance();
+            const daiBalanceAfter = await dai.balanceOf(defaults.user.address);
+            const order = await getCreatedSwapOrder(defaults.user.address);
+
+            expect(balanceAfter, 'balanceAfter').to.be.equal(balanceBefore.add(defaults.executionFee).sub(txFees));
+            expect(daiBalanceAfter, 'daiBalanceAfter').to.be.eq(daiBalanceBefore.add(defaults.swapAmountIn));
+
+            expect(order.account, 'account').to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("cancelSwapOrder, tokenA == BNB", async () => {
+            const triggerRatio = toUsd(1).mul(PRICE_PRECISION).div(toUsd(550));
+            const amountIn = expandDecimals(10, 18);
+            const value = defaults.executionFee.add(amountIn);
+            await defaultCreateSwapOrder({
+                path: [bnb.address, dai.address],
+                triggerRatio,
+                triggerAboveThreshold: false,
+                amountIn,
+                value
+            });
+
+            const balanceBefore = await defaults.user.getBalance();
+
+            const tx = await orderBook.connect(defaults.user).cancelSwapOrder(0);
+            reportGasUsed(provider, tx, "canceSwapOrder");
+            const txFees = await getTxFees(tx);
+
+            const balanceAfter = await user0.getBalance();
+            const order = await getCreatedSwapOrder(defaults.user.address);
+
+            expect(balanceAfter, 'balanceAfter').to.be.equal(
+                balanceBefore.add(value).sub(txFees)
+            );
+
+            expect(order.account, 'account').to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("updateSwapOrder, bad price conditions", async () => {
+            const triggerRatio = toUsd(58000).mul(PRICE_PRECISION).div(toUsd(1));
+            await defaultCreateSwapOrder({
+                triggerRatio 
+            });
+
+            const orderBefore = await getCreatedSwapOrder(defaults.user.address);
+
+            validateOrderFields(orderBefore, {
+                triggerRatio,
+                triggerAboveThreshold: defaults.triggerAboveThreshold,
+                minOut: defaults.minOut
+            });
+
+            const newTriggerRatio = toUsd(58000).mul(PRICE_PRECISION).div(toUsd(1));
+            const newTriggerAboveThreshold = !defaults.triggerAboveThreshold;
+            const newMinOut = expandDecimals(1, 8).div(1000);
+
+            const tx = await orderBook.connect(defaults.user).updateSwapOrder(0, newMinOut, newTriggerRatio, newTriggerAboveThreshold);
+            reportGasUsed(provider, tx, 'updateSwapOrder');
+
+            const orderAfter = await getCreatedSwapOrder(defaults.user.address);
+            validateOrderFields(orderAfter, {
+                triggerRatio: newTriggerRatio,
+                triggerAboveThreshold: newTriggerAboveThreshold,
+                minOut: newMinOut
+            });
+        });
+
+        it("executeSwapOrder", async () => {
+            const triggerRatio = toUsd(58000).mul(PRICE_PRECISION).div(toUsd(BNB_PRICE));
+            const amountIn = expandDecimals(10, 18);
+            const value = defaults.executionFee.add(amountIn);
+            await defaultCreateSwapOrder({
+                path: [bnb.address, btc.address],
+                triggerRatio,
+                triggerAboveThreshold: false,
+                amountIn,
+                value
+            });
+
+            await expect(orderBook.executeSwapOrder(defaults.user.address, 2, user1.address))
+                .to.be.revertedWith("OrderBook: non-existent order");
+
+            btcPriceFeed.setLatestAnswer(toChainlinkPrice(58100));
+            await expect(orderBook.executeSwapOrder(defaults.user.address, 0, user1.address))
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+
+            btcPriceFeed.setLatestAnswer(toChainlinkPrice(57900));
+
+            const user1BalanceBefore = await user1.getBalance();
+            const userBtcBalanceBefore = await btc.balanceOf(defaults.user.address);
+
+            const tx = await orderBook.executeSwapOrder(defaults.user.address, 0, user1.address);
+            reportGasUsed(provider, tx, 'executeSwapOrder');
+
+            const user1BalanceAfter = await user1.getBalance();
+            expect(user1BalanceAfter, 'user1BalanceAfter').to.be.equal(user1BalanceBefore.add(defaults.executionFee));
+
+            const userBtcBalanceAfter = await btc.balanceOf(defaults.user.address);
+            expect(userBtcBalanceAfter.gt(userBtcBalanceBefore.add(defaults.minOut)), 'userBtcBalanceAfter').to.be.true;
+
+            const order = await getCreatedSwapOrder(defaults.user.address, 0);
+            expect(order.account).to.be.equal(ZERO_ADDRESS);
+        });
+
+        it("Full scenario", async () => {
+            const triggerRatio1 = toUsd(BTC_PRICE + 2000).mul(PRICE_PRECISION).div(toUsd(1));
+            const order1Index = 0;
+            // buy BTC with DAI when BTC price goes up
+            await defaultCreateSwapOrder({
+                path: [dai.address, btc.address],
+                triggerRatio: triggerRatio1,
+                triggerAboveThreshold: true
+            });
+
+            // buy BTC with BNB when BTC price goes up
+            let triggerRatio2 = toUsd(BTC_PRICE - 5000).mul(PRICE_PRECISION).div(toUsd(BNB_PRICE));
+            const order2Index = 1;
+            const amountIn = expandDecimals(5, 18);
+            const value = defaults.executionFee.add(amountIn);
+            await defaultCreateSwapOrder({
+                path: [bnb.address, btc.address],
+                triggerRatio: triggerRatio2,
+                triggerAboveThreshold: false,
+                amountIn,
+                value
+            });
+
+            // buy BTC with BNB when BTC price goes up
+            let triggerRatio3 = toUsd(BTC_PRICE - 5000).mul(PRICE_PRECISION).div(toUsd(BNB_PRICE));
+            const order3Index = 2;
+            await defaultCreateSwapOrder({
+                path: [dai.address, btc.address],
+                triggerRatio: triggerRatio3,
+                triggerAboveThreshold: false
+            });
+
+            // try to execute order 1
+            await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE + 1500));
+            await expect(orderBook.executeSwapOrder(defaults.user.address, order1Index, user1.address))
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+
+            // update order 1
+            const newTriggerRatio1 = toUsd(BTC_PRICE + 1000).mul(PRICE_PRECISION).div(toUsd(1));
+            await orderBook.connect(defaults.user).updateSwapOrder(order1Index, defaults.minOut, newTriggerRatio1, true);
+            let order1 = await getCreatedSwapOrder(defaults.user.address, order1Index);
+            expect(order1.triggerRatio, 'order1 triggerRatio').to.be.equal(newTriggerRatio1);
+
+            //  execute order 1
+            let btcBalanceBefore = await btc.balanceOf(defaults.user.address);
+            await orderBook.executeSwapOrder(defaults.user.address, order1Index, user1.address);
+            order1 = await getCreatedSwapOrder(defaults.user.address, order1Index);
+            expect(order1.account, 'order1 account').to.be.equal(ZERO_ADDRESS);
+
+            // cancel order 3
+            await orderBook.connect(defaults.user).cancelSwapOrder(order3Index);
+            let order3 = await getCreatedSwapOrder(defaults.user.address, order3Index);
+            expect(order3.account, 'order3 account').to.be.equal(ZERO_ADDRESS);
+
+            let btcBalanceAfter = await btc.balanceOf(defaults.user.address);
+            expect(btcBalanceAfter.gt(btcBalanceBefore.add(defaults.minOut)), 'btcBalanceBefore');
+
+            // try to execute order 2
+            await expect(orderBook.executeSwapOrder(defaults.user.address, order2Index, user1.address))
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+
+            // execute order 2
+            await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(BNB_PRICE + 100)); // BTC price decreased relative to BNB
+            await orderBook.executeSwapOrder(defaults.user.address, order2Index, user1.address);
+            let order2 = await getCreatedSwapOrder(defaults.user.address, order2Index);
+            expect(order2.account, 'order2 account').to.be.equal(ZERO_ADDRESS);
+        });
+    });
+
+    // TODO check increment works. two new orders have different indices
+
+    // TODO migrate to validateOrder helper
 
     describe("Increase position orders", () => {
         it("createIncreaseOrder, bad input", async () => {
