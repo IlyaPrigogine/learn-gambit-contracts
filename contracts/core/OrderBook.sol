@@ -14,7 +14,7 @@ import "./interfaces/IVault.sol";
 import "./interfaces/IOrderBook.sol";
 import "../tokens/interfaces/IWETH.sol";
 
-//import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 contract OrderBook is ReentrancyGuard, IOrderBook {
     using SafeMath for uint256;
@@ -203,8 +203,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 triggerRatio,
         bool triggerAboveThreshold,
         uint256 executionFee,
-        uint256 tokenAPrice,
-        uint256 tokenBPrice,
         uint256 amountOut
     );
 
@@ -344,27 +342,29 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         address tokenB,
         uint256 triggerRatio,
         bool triggerAboveThreshold
-    ) private view returns (uint256, uint256) {
+    ) private view {
         uint256 tokenAPrice = IVault(vault).getMinPrice(tokenA);
         uint256 tokenBPrice = IVault(vault).getMaxPrice(tokenB);
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
 
         bool isValid = triggerAboveThreshold ? currentRatio > triggerRatio : currentRatio < triggerRatio;
         require(isValid, "OrderBook: invalid price for execution");
-
-        return (tokenAPrice, tokenBPrice);
     }
 
     function executeSwapOrder(address _account, uint256 _orderIndex, address payable _feeReceiver) external nonReentrant {
         SwapOrder memory order = swapOrders[_account][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
 
-        (uint256 tokenAPrice, uint256 tokenBPrice) = _validateSwapOrderPrice(
-            order.path[0],
-            order.path[1],
-            order.triggerRatio,
-            order.triggerAboveThreshold
-        );
+        if (order.triggerAboveThreshold) {
+            // gas optimisation
+            // order.minAmount should prevent wrong price execution
+            _validateSwapOrderPrice(
+                order.path[0],
+                order.path[1],
+                order.triggerRatio,
+                order.triggerAboveThreshold
+            );
+        }
 
         delete swapOrders[_account][_orderIndex];
 
@@ -389,8 +389,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             order.triggerRatio,
             order.triggerAboveThreshold,
             order.executionFee,
-            tokenAPrice,
-            tokenBPrice,
             _amountOut
         );
     }
@@ -407,6 +405,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         bool _triggerAboveThreshold,
         uint256 _executionFee
     ) external payable {
+        // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
         if (_path[0] != weth) {
@@ -422,6 +421,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         } else {
             _purchaseTokenAmount = _amountIn;
         }
+
+        console.log('_purchaseTokenAmount', _purchaseTokenAmount);
 
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
         if (_path[0] == weth) {
@@ -500,6 +501,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         bool _triggerAboveThreshold,
         uint256 _executionFee
     ) external payable {
+        // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
@@ -546,6 +548,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             IERC20(order.collateralToken).safeTransfer(vault, amountOut);
         }
 
+        // TODO do we need this check here?
+        // if (_isLong) {
+        //     require(IVault(vault).getMaxPrice(_indexToken) <= _price, "Router: mark price higher than limit");
+        // } else {
+        //     require(IVault(vault).getMinPrice(_indexToken) >= _price, "Router: mark price lower than limit");
+        // }
+
+
         IRouter(router).pluginIncreasePosition(order.account, order.collateralToken, order.indexToken, order.sizeDelta, order.isLong);
         _transferOutETH(order.executionFee, _feeReceiver);
 
@@ -582,7 +592,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
 
         if (order.collateralToken == weth) {
-            payable(order.account).sendValue(amountOut);
+            console.log('amountOut', amountOut);
+            _transferOutETH(amountOut, payable(order.account));
         } else {
             IERC20(order.collateralToken).safeTransfer(order.account, amountOut);
         }
