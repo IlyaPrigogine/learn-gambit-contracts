@@ -49,6 +49,7 @@ contract Timelock {
     }
 
     function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {
+        require(_priceSampleSpace <= 3, "Invalid _priceSampleSpace");
         IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);
     }
 
@@ -65,6 +66,7 @@ contract Timelock {
     }
 
     function setMaxGasPrice(address _vault,uint256 _maxGasPrice) external onlyAdmin {
+        require(_maxGasPrice > 5000000000, "Invalid _maxGasPrice");
         IVault(_vault).setMaxGasPrice(_maxGasPrice);
     }
 

@@ -138,12 +138,12 @@ describe("Timelock", function () {
   })
 
   it("setMaxGasPrice", async () => {
-    await expect(timelock.connect(user0).setMaxGasPrice(vault.address, 5000000000))
+    await expect(timelock.connect(user0).setMaxGasPrice(vault.address, 7000000000))
       .to.be.revertedWith("Timelock: forbidden")
 
     expect(await vault.maxGasPrice()).eq(10000000000)
-    await timelock.connect(wallet).setMaxGasPrice(vault.address, 5000000000)
-    expect(await vault.maxGasPrice()).eq(5000000000)
+    await timelock.connect(wallet).setMaxGasPrice(vault.address, 7000000000)
+    expect(await vault.maxGasPrice()).eq(7000000000)
   })
 
   it("approve", async () => {
