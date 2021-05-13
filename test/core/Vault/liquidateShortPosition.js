@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig, validateVaultBalance } = require("./helpers")
 
 use(solidity)
 
@@ -149,5 +149,7 @@ describe("Vault.liquidateShortPosition", function () {
     expect(await vault.guaranteedUsd(dai.address)).eq(0)
     expect(await vault.poolAmounts(dai.address)).eq("104780000000000000000") // 104.78
     expect(await dai.balanceOf(user2.address)).eq(expandDecimals(5, 18))
+
+    await validateVaultBalance(expect, vault, dai)
   })
 })

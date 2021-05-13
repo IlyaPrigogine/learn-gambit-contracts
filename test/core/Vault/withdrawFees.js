@@ -204,7 +204,7 @@ describe("Vault.withdrawFees", function () {
     await expect(vault.connect(user0).withdrawFees(bnb.address, user2.address))
       .to.be.revertedWith("Vault: forbidden")
 
-    const timelock = await deployContract("Timelock", [])
+    const timelock = await deployContract("Timelock", [5 * 24 * 60 * 60])
     await vault.setGov(timelock.address)
 
     await expect(timelock.connect(user0).withdrawFees(vault.address, bnb.address, user2.address))

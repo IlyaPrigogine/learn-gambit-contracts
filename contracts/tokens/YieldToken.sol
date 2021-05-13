@@ -64,7 +64,7 @@ contract YieldToken is IERC20, IYieldToken {
         admins[_account] = true;
     }
 
-    function removeAdmin(address _account) external onlyGov {
+    function removeAdmin(address _account) external override onlyGov {
         admins[_account] = false;
     }
 

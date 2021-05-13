@@ -16,7 +16,19 @@ async function main() {
   const tokens = [btc, eth, bnb, busd, usdc, usdt]
 
   for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i]
+    const token = await contractAt("Token", tokens[i].address)
+    const poolAmount = await vault.poolAmounts(token.address)
+    const feeReserve = await vault.feeReserves(token.address)
+    const balance = await token.balanceOf(vault.address)
+    const vaultAmount = poolAmount.add(feeReserve)
+    const acccountBalance = await token.balanceOf(receiver.address)
+
+    if (vaultAmount.gt(balance)) {
+      const diff = vaultAmount.sub(balance)
+      console.log(`${token.address}: ${diff.toString()}, ${acccountBalance.toString()}`)
+      await sendTxn(token.transfer(vault.address, diff), `token.transfer ${i}`)
+    }
+
     await sendTxn(gov.withdrawFees(vault.address, token.address, receiver.address), `gov.withdrawFees ${i}`)
   }
 }

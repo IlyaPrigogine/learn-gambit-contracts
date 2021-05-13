@@ -4,7 +4,7 @@ const { deployContract } = require("../../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../../shared/utilities")
 const { toChainlinkPrice } = require("../../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../../shared/units")
-const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("./helpers")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig, validateVaultBalance } = require("./helpers")
 
 use(solidity)
 
@@ -135,6 +135,8 @@ describe("Vault.averagePrice", function () {
     delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
     expect(delta[0]).eq(true)
     expect(delta[1]).eq(toUsd(9))
+
+    await validateVaultBalance(expect, vault, btc)
   })
 
   it("position.averagePrice, buyPrice == markPrice", async () => {
@@ -220,6 +222,8 @@ describe("Vault.averagePrice", function () {
     delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
     expect(delta[0]).eq(true)
     expect(delta[1]).eq("20842572062084257206208425720620") // ~20.84
+
+    await validateVaultBalance(expect, vault, btc)
   })
 
   it("position.averagePrice, buyPrice < averagePrice", async () => {
@@ -300,6 +304,8 @@ describe("Vault.averagePrice", function () {
     delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
     expect(delta[0]).eq(true)
     expect(delta[1]).eq("1111111111111111111111111111111") // ~1.111
+
+    await validateVaultBalance(expect, vault, btc)
   })
 
   it("long position.averagePrice, buyPrice == averagePrice", async () => {
@@ -348,6 +354,8 @@ describe("Vault.averagePrice", function () {
     delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
     expect(delta[0]).eq(false)
     expect(delta[1]).eq(0)
+
+    await validateVaultBalance(expect, vault, btc)
   })
 
   it("long position.averagePrice, buyPrice > averagePrice", async () => {
@@ -393,6 +401,8 @@ describe("Vault.averagePrice", function () {
     delta = await vault.getPositionDelta(user0.address, btc.address, btc.address, true)
     expect(delta[0]).eq(true)
     expect(delta[1]).eq(toUsd(22.5))
+
+    await validateVaultBalance(expect, vault, btc)
   })
 
   it("long position.averagePrice, buyPrice < averagePrice", async () => {

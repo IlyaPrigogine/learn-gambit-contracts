@@ -53,7 +53,7 @@ describe("Timelock", function () {
 
     await vault.setPriceFeed(user3.address)
 
-    timelock = await deployContract("Timelock", [])
+    timelock = await deployContract("Timelock", [5 * 24 * 60 * 60])
     await vault.setGov(timelock.address)
 
     await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)
@@ -138,12 +138,12 @@ describe("Timelock", function () {
   })
 
   it("setMaxGasPrice", async () => {
-    await expect(timelock.connect(user0).setMaxGasPrice(vault.address, 5000000000))
+    await expect(timelock.connect(user0).setMaxGasPrice(vault.address, 7000000000))
       .to.be.revertedWith("Timelock: forbidden")
 
     expect(await vault.maxGasPrice()).eq(10000000000)
-    await timelock.connect(wallet).setMaxGasPrice(vault.address, 5000000000)
-    expect(await vault.maxGasPrice()).eq(5000000000)
+    await timelock.connect(wallet).setMaxGasPrice(vault.address, 7000000000)
+    expect(await vault.maxGasPrice()).eq(7000000000)
   })
 
   it("approve", async () => {
