@@ -53,7 +53,7 @@ describe("Timelock", function () {
 
     await vault.setPriceFeed(user3.address)
 
-    timelock = await deployContract("Timelock", [])
+    timelock = await deployContract("Timelock", [5 * 24 * 60 * 60])
     await vault.setGov(timelock.address)
 
     await vaultPriceFeed.setTokenConfig(bnb.address, bnbPriceFeed.address, 8, false)

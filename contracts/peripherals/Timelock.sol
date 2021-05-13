@@ -6,6 +6,7 @@ import "./interfaces/ITimelockTarget.sol";
 import "../core/interfaces/IVault.sol";
 import "../core/interfaces/IVaultPriceFeed.sol";
 import "../core/interfaces/IRouter.sol";
+import "../tokens/interfaces/IYieldToken.sol";
 
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
@@ -13,8 +14,7 @@ import "../libraries/token/IERC20.sol";
 contract Timelock {
     using SafeMath for uint256;
 
-    uint256 public constant BUFFER = 5 days;
-
+    uint256 public buffer;
     address public admin;
 
     mapping (bytes32 => uint256) public pendingActions;
@@ -31,8 +31,13 @@ contract Timelock {
         _;
     }
 
-    constructor() public {
+    constructor(uint256 _buffer) public {
+        buffer = _buffer;
         admin = msg.sender;
+    }
+
+    function removeAdmin(address _token, address _account) external onlyAdmin {
+        IYieldToken(_token).removeAdmin(_account);
     }
 
     function setIsAmmEnabled(address _priceFeed, bool _isEnabled) external onlyAdmin {
@@ -124,7 +129,7 @@ contract Timelock {
     }
 
     function _setPendingAction(bytes32 _action) private {
-        pendingActions[_action] = block.timestamp.add(BUFFER);
+        pendingActions[_action] = block.timestamp.add(buffer);
         emit SignalPendingAction(_action);
     }
 

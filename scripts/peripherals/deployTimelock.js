@@ -1,7 +1,8 @@
 const { deployContract, contractAt } = require("../shared/helpers")
 
 async function main() {
-  await deployContract("Timelock", [])
+  const buffer = 5 * 24 * 60 * 60
+  await deployContract("Timelock", [buffer])
 }
 
 main()
