@@ -306,7 +306,7 @@ describe("OrderBook, decrease position orders", () => {
         expect(executorBalanceAfter).to.be.equal(executorBalanceBefore.add(defaults.executionFee));
 
         const btcBalanceAfter = await btc.balanceOf(defaults.user.address);
-        expect(btcBalanceAfter.sub(btcBalanceBefore)).to.be.equal("17899051");
+        expect(btcBalanceAfter.sub(btcBalanceBefore)).to.be.equal('17899051');
 
         position = positionWrapper(await vault.getPosition(defaults.user.address, btc.address, btc.address, defaults.isLong));
 
