@@ -14,7 +14,6 @@ import "./interfaces/IVault.sol";
 import "./interfaces/IOrderBook.sol";
 import "../tokens/interfaces/IWETH.sol";
 
-// import "hardhat/console.sol";
 
 contract OrderBook is ReentrancyGuard, IOrderBook {
     using SafeMath for uint256;
@@ -422,8 +421,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _purchaseTokenAmount = _amountIn;
         }
 
-        console.log('_purchaseTokenAmount', _purchaseTokenAmount);
-
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
         if (_path[0] == weth) {
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
@@ -543,18 +540,9 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             path[0] = order.purchaseToken;
             path[1] = order.collateralToken;
 
-            // Q: can I swap and send to vault at once?
             uint256 amountOut = _swap(path, 0, address(this));
             IERC20(order.collateralToken).safeTransfer(vault, amountOut);
         }
-
-        // TODO do we need this check here?
-        // if (_isLong) {
-        //     require(IVault(vault).getMaxPrice(_indexToken) <= _price, "Router: mark price higher than limit");
-        // } else {
-        //     require(IVault(vault).getMinPrice(_indexToken) >= _price, "Router: mark price lower than limit");
-        // }
-
 
         IRouter(router).pluginIncreasePosition(order.account, order.collateralToken, order.indexToken, order.sizeDelta, order.isLong);
         _transferOutETH(order.executionFee, _feeReceiver);
@@ -592,7 +580,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
 
         if (order.collateralToken == weth) {
-            console.log('amountOut', amountOut);
             _transferOutETH(amountOut, payable(order.account));
         } else {
             IERC20(order.collateralToken).safeTransfer(order.account, amountOut);
