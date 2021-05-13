@@ -143,7 +143,7 @@ describe("OrderBook, decrease position orders", () => {
         const order = await orderBook.decreaseOrders(address, orderIndex);
         return order;
     }
-    
+
     /*
     checklist:
     [x] create order, low execution fee => revert
@@ -183,7 +183,7 @@ describe("OrderBook, decrease position orders", () => {
     it("Create decrease order, long", async () => {
         const tx = await defaultCreateDecreaseOrder();
         reportGasUsed(provider, tx, 'createDecraseOrder gas used');
-        let order = await getCreatedDecreaseOrder(user0.address);
+        let order = await getCreatedDecreaseOrder(defaults.user.address);
         const btcBalanceAfter = await btc.balanceOf(orderBook.address);
 
         expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
@@ -213,7 +213,7 @@ describe("OrderBook, decrease position orders", () => {
             0, newCollateralDelta, newSizeDelta, newTriggerPrice, newTriggerAboveThreshold
         )).to.be.revertedWith("OrderBook: non-existent order");
 
-        const tx2 = await orderBook.connect(user0).updateDecreaseOrder(
+        const tx2 = await orderBook.connect(defaults.user).updateDecreaseOrder(
             0, newCollateralDelta, newSizeDelta, newTriggerPrice, newTriggerAboveThreshold
         );
         reportGasUsed(provider, tx2, 'updateDecreaseOrder gas used');
@@ -233,7 +233,7 @@ describe("OrderBook, decrease position orders", () => {
             isLong: false
         });
         reportGasUsed(provider, tx, 'createDecreaseOrder gas used');
-        const order = await getCreatedDecreaseOrder(user0.address);
+        const order = await getCreatedDecreaseOrder(defaults.user.address);
         const btcBalanceAfter = await btc.balanceOf(orderBook.address);
 
         expect(await bnb.balanceOf(orderBook.address), 'BNB balance').to.be.equal(defaults.executionFee);
@@ -280,11 +280,11 @@ describe("OrderBook, decrease position orders", () => {
     });
 
     it("Execute decrease order, long", async () => {
-        await btc.connect(user0).transfer(vault.address, expandDecimals(10000, 8).div(BTC_PRICE));
-        await vault.connect(user0).increasePosition(user0.address, btc.address, btc.address, toUsd(20000), true);
+        await btc.connect(defaults.user).transfer(vault.address, expandDecimals(10000, 8).div(BTC_PRICE));
+        await vault.connect(defaults.user).increasePosition(defaults.user.address, btc.address, btc.address, toUsd(20000), true);
 
-        const btcBalanceBefore = await btc.balanceOf(user0.address);
-        let position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, true));
+        const btcBalanceBefore = await btc.balanceOf(defaults.user.address);
+        let position = positionWrapper(await vault.getPosition(defaults.user.address, btc.address, btc.address, true));
 
         await defaultCreateDecreaseOrder({
             collateralDelta: position.collateral,
@@ -305,10 +305,10 @@ describe("OrderBook, decrease position orders", () => {
         const executorBalanceAfter = await user1.getBalance();
         expect(executorBalanceAfter).to.be.equal(executorBalanceBefore.add(defaults.executionFee));
 
-        const btcBalanceAfter = await btc.balanceOf(user0.address);
+        const btcBalanceAfter = await btc.balanceOf(defaults.user.address);
         expect(btcBalanceAfter.sub(btcBalanceBefore)).to.be.equal("17899051");
 
-        position = positionWrapper(await vault.getPosition(user0.address, btc.address, btc.address, defaults.isLong));
+        position = positionWrapper(await vault.getPosition(defaults.user.address, btc.address, btc.address, defaults.isLong));
 
         expect(position.size).to.be.equal(0);
         expect(position.collateral).to.be.equal(0);
@@ -318,11 +318,11 @@ describe("OrderBook, decrease position orders", () => {
     });
 
     it("Execute decrease order, short, BTC", async () => {
-        await dai.connect(user0).transfer(vault.address, expandDecimals(10000, 18));
-        await vault.connect(user0).increasePosition(user0.address, dai.address, btc.address, toUsd(20000), false);
+        await dai.connect(defaults.user).transfer(vault.address, expandDecimals(10000, 18));
+        await vault.connect(defaults.user).increasePosition(defaults.user.address, dai.address, btc.address, toUsd(20000), false);
 
-        let position = positionWrapper(await vault.getPosition(user0.address, dai.address, btc.address, false));
-        const daiBalanceBefore = await dai.balanceOf(user0.address);
+        let position = positionWrapper(await vault.getPosition(defaults.user.address, dai.address, btc.address, false));
+        const daiBalanceBefore = await dai.balanceOf(defaults.user.address);
 
         await defaultCreateDecreaseOrder({
             collateralDelta: position.collateral,
@@ -359,7 +359,7 @@ describe("OrderBook, decrease position orders", () => {
     });
 
     it("Execute decrease order, long, BNB", async () => {
-        await router.connect(user0).increasePositionETH(
+        await router.connect(defaults.user).increasePositionETH(
             [bnb.address],
             bnb.address,
             0,
@@ -369,7 +369,7 @@ describe("OrderBook, decrease position orders", () => {
             {value: expandDecimals(5, 18)}
         );
 
-        let position = positionWrapper(await vault.getPosition(user0.address, bnb.address, bnb.address, true));
+        let position = positionWrapper(await vault.getPosition(defaults.user.address, bnb.address, bnb.address, true));
 
         const userTx = await defaultCreateDecreaseOrder({
             collateralDelta: position.collateral.div(2),

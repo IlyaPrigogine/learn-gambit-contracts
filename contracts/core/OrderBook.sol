@@ -336,12 +336,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
     }
 
-    function _validateSwapOrderPrice(
+    function validateSwapOrderPrice(
         address tokenA,
         address tokenB,
         uint256 triggerRatio,
         bool triggerAboveThreshold
-    ) private view {
+    ) public view {
         uint256 tokenAPrice = IVault(vault).getMinPrice(tokenA);
         uint256 tokenBPrice = IVault(vault).getMaxPrice(tokenB);
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
@@ -356,8 +356,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
         if (order.triggerAboveThreshold) {
             // gas optimisation
-            // order.minAmount should prevent wrong price execution
-            _validateSwapOrderPrice(
+            // order.minAmount should prevent wrong price execution in case of simple limit order
+            validateSwapOrderPrice(
                 order.path[0],
                 order.path[1],
                 order.triggerRatio,
@@ -377,6 +377,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _amountOut = _swap(order.path, order.minOut, order.account);
         }
 
+        // pay executor
         _transferOutETH(order.executionFee, _feeReceiver);
 
         emit ExecuteSwapOrder(
@@ -517,9 +518,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
     }
 
-    function _validatePositionOrderPrice(bool _triggerAboveThreshold, uint256 _triggerPrice, address _indexToken) private view returns (uint256) {
-        // TODO Q: actually the opposite may be desirable
-        // e.g. user may want to open short position as soon as price "crosses" threshold
+    function validatePositionOrderPrice(bool _triggerAboveThreshold, uint256 _triggerPrice, address _indexToken) public view returns (uint256) {
         uint256 currentPrice = _triggerAboveThreshold 
             ? IVault(vault).getMinPrice(_indexToken) : IVault(vault).getMaxPrice(_indexToken);
         bool isPriceValid = _triggerAboveThreshold ? currentPrice > _triggerPrice : currentPrice < _triggerPrice;
@@ -531,7 +530,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         IncreaseOrder memory order = increaseOrders[_address][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
         delete increaseOrders[_address][_orderIndex];
-        uint256 currentPrice = _validatePositionOrderPrice(order.triggerAboveThreshold, order.triggerPrice, order.indexToken);
+        uint256 currentPrice = validatePositionOrderPrice(order.triggerAboveThreshold, order.triggerPrice, order.indexToken);
 
         IERC20(order.purchaseToken).safeTransfer(vault, order.purchaseTokenAmount);
 
@@ -545,6 +544,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         }
 
         IRouter(router).pluginIncreasePosition(order.account, order.collateralToken, order.indexToken, order.sizeDelta, order.isLong);
+
+        // pay executor
         _transferOutETH(order.executionFee, _feeReceiver);
 
         emit ExecuteIncreaseOrder(
@@ -567,7 +568,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         require(order.account != address(0), "OrderBook: non-existent order");
         delete decreaseOrders[_address][_orderIndex];
 
-        uint256 currentPrice = _validatePositionOrderPrice(order.triggerAboveThreshold, order.triggerPrice, order.indexToken);
+        uint256 currentPrice = validatePositionOrderPrice(order.triggerAboveThreshold, order.triggerPrice, order.indexToken);
 
         uint256 amountOut = IRouter(router).pluginDecreasePosition(
             order.account,
@@ -579,12 +580,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             address(this)
         );
 
+        // transfer released collateral to user
         if (order.collateralToken == weth) {
             _transferOutETH(amountOut, payable(order.account));
         } else {
             IERC20(order.collateralToken).safeTransfer(order.account, amountOut);
         }
 
+        // pay executor
         _transferOutETH(order.executionFee, _feeReceiver);
 
         emit ExecuteDecreaseOrder(
