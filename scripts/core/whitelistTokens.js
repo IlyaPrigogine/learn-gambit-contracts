@@ -1,9 +1,34 @@
 const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
+const shouldSetTokenConfig = false
+
+async function setVaultTokenConfig({
+  vault,
+  token,
+  tokenDecimals,
+  redemptionBasisPoints,
+  minProfitBps,
+  isStable,
+  isShortable,
+  symbol
+}) {
+  if (!shouldSetTokenConfig) { return }
+
+  await sendTxn(vault.setTokenConfig(
+    token.address, // _token
+    tokenDecimals, // _tokenDecimals
+    redemptionBasisPoints, // _redemptionBps
+    minProfitBps, // _minProfitBps
+    isStable, // _isStable
+    isShortable // _isShortable
+  ), `vault.setTokenConfig(${symbol})`)
+}
+
 async function main() {
   const vault = await contractAt("Vault", "0xc73A8DcAc88498FD4b4B1b2AaA37b0a2614Ff67B")
-  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0xe700Db0f0e609cC92ED521C0e956F8e915D9Ac1B")
+  const secondaryPriceFeed = { address: "0xDA7a001b254CD22e46d3eAB04d937489c93174C3" }
+  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0xf0313A44bE7e39Da035Ec581998314520aE42749")
   const redemptionBasisPoints = 10000
 
   const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
@@ -20,6 +45,8 @@ async function main() {
   const usdcPriceFeed = { address: "0x51597f405303C4377E36123cBc172b13269EA163" }
   const usdtPriceFeed = { address: "0xB97Ad0E74fa7d920791E90258A6E2085088b4320" }
 
+  await sendTxn(vaultPriceFeed.setSecondaryPriceFeed(secondaryPriceFeed.address), "vaultPriceFeed.setSecondaryPriceFeed")
+
   await sendTxn(vaultPriceFeed.setTokenConfig(
     btc.address, // _token
     btcPriceFeed.address, // _priceFeed
@@ -27,14 +54,16 @@ async function main() {
     false // _isStrictStable
   ), "vaultPriceFeed.setTokenConfig(btc)")
 
-  await sendTxn(vault.setTokenConfig(
-    btc.address, // _token
-    18, // _tokenDecimals
-    redemptionBasisPoints, // _redemptionBps
-    0, // _minProfitBps
-    false, // _isStable
-    true // _isShortable
-  ), "vault.setTokenConfig(btc)")
+  await setVaultTokenConfig({
+    vault,
+    token: btc,
+    tokenDecimals: 18,
+    redemptionBasisPoints,
+    minProfitBps: 0,
+    isStable: false,
+    isShortable: true,
+    symbol: "btc"
+  })
 
   await sendTxn(vaultPriceFeed.setTokenConfig(
     eth.address, // _token
@@ -43,14 +72,16 @@ async function main() {
     false // _isStrictStable
   ), "vaultPriceFeed.setTokenConfig(eth)")
 
-  await sendTxn(vault.setTokenConfig(
-    eth.address, // _token
-    18, // _tokenDecimals
-    redemptionBasisPoints, // _redemptionBps
-    0, // _minProfitBps
-    false, // _isStable
-    true // _isShortable
-  ), "vault.setTokenConfig(eth)")
+  await setVaultTokenConfig({
+    vault,
+    token: eth,
+    tokenDecimals: 18,
+    redemptionBasisPoints,
+    minProfitBps: 0,
+    isStable: false,
+    isShortable: true,
+    symbol: "eth"
+  })
 
   await sendTxn(vaultPriceFeed.setTokenConfig(
     bnb.address, // _token
@@ -59,14 +90,16 @@ async function main() {
     false // _isStrictStable
   ), "vaultPriceFeed.setTokenConfig(bnb)")
 
-  await sendTxn(vault.setTokenConfig(
-    bnb.address, // _token
-    18, // _tokenDecimals
-    redemptionBasisPoints, // _redemptionBps
-    0, // _minProfitBps
-    false, // _isStable
-    true // _isShortable
-  ), "vault.setTokenConfig(bnb)")
+  await setVaultTokenConfig({
+    vault,
+    token: bnb,
+    tokenDecimals: 18,
+    redemptionBasisPoints,
+    minProfitBps: 0,
+    isStable: false,
+    isShortable: true,
+    symbol: "bnb"
+  })
 
   await sendTxn(vaultPriceFeed.setTokenConfig(
     busd.address, // _token
@@ -75,14 +108,16 @@ async function main() {
     true // _isStrictStable
   ), "vaultPriceFeed.setTokenConfig(busd)")
 
-  await sendTxn(vault.setTokenConfig(
-    busd.address, // _token
-    18, // _tokenDecimals
-    redemptionBasisPoints, // _redemptionBps
-    0, // _minProfitBps
-    true, // _isStable
-    false // _isShortable
-  ), "vault.setTokenConfig(busd)")
+  await setVaultTokenConfig({
+    vault,
+    token: busd,
+    tokenDecimals: 18,
+    redemptionBasisPoints,
+    minProfitBps: 0,
+    isStable: true,
+    isShortable: false,
+    symbol: "busd"
+  })
 
   await sendTxn(vaultPriceFeed.setTokenConfig(
     usdc.address, // _token
@@ -91,14 +126,16 @@ async function main() {
     true // _isStrictStable
   ), "vaultPriceFeed.setTokenConfig(usdc)")
 
-  await sendTxn(vault.setTokenConfig(
-    usdc.address, // _token
-    18, // _tokenDecimals
-    redemptionBasisPoints, // _redemptionBps
-    0, // _minProfitBps
-    true, // _isStable
-    false // _isShortable
-  ), "vault.setTokenConfig(usdc)")
+  await setVaultTokenConfig({
+    vault,
+    token: usdc,
+    tokenDecimals: 18,
+    redemptionBasisPoints,
+    minProfitBps: 0,
+    isStable: true,
+    isShortable: false,
+    symbol: "usdc"
+  })
 
   await sendTxn(vaultPriceFeed.setTokenConfig(
     usdt.address, // _token
@@ -107,14 +144,16 @@ async function main() {
     true // _isStrictStable
   ), "vaultPriceFeed.setTokenConfig(usdt)")
 
-  await sendTxn(vault.setTokenConfig(
-    usdt.address, // _token
-    18, // _tokenDecimals
-    redemptionBasisPoints, // _redemptionBps
-    0, // _minProfitBps
-    true, // _isStable
-    false // _isShortable
-  ), "vault.setTokenConfig(usdt)")
+  await setVaultTokenConfig({
+    vault,
+    token: usdt,
+    tokenDecimals: 18,
+    redemptionBasisPoints,
+    minProfitBps: 0,
+    isStable: true,
+    isShortable: false,
+    symbol: "usdt"
+  })
 }
 
 main()

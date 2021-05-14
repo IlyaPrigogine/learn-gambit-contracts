@@ -251,7 +251,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _stableSwapFeeBasisPoints,
         uint256 _marginFeeBasisPoints,
         uint256 _liquidationFeeUsd
-    ) external {
+    ) external override {
         _onlyGov();
         require(_swapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _swapFeeBasisPoints");
         require(_stableSwapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _stableSwapFeeBasisPoints");

@@ -14,6 +14,8 @@ import "../libraries/token/IERC20.sol";
 contract Timelock {
     using SafeMath for uint256;
 
+    uint256 public constant PRICE_PRECISION = 10 ** 30;
+
     uint256 public buffer;
     address public admin;
 
@@ -36,12 +38,36 @@ contract Timelock {
         admin = msg.sender;
     }
 
+    function setFees(
+        address _vault,
+        uint256 _swapFeeBasisPoints,
+        uint256 _stableSwapFeeBasisPoints,
+        uint256 _marginFeeBasisPoints,
+        uint256 _liquidationFeeUsd
+    ) external onlyAdmin {
+        require(_swapFeeBasisPoints < 30, "Timelock: invalid _swapFeeBasisPoints");
+        require(_stableSwapFeeBasisPoints < 30, "Timelock: invalid _stableSwapFeeBasisPoints");
+        require(_marginFeeBasisPoints < 30, "Timelock: invalid _marginFeeBasisPoints");
+        require(_liquidationFeeUsd < 10 * PRICE_PRECISION, "Timelock: invalid _liquidationFeeUsd");
+
+        IVault(_vault).setFees(
+            _swapFeeBasisPoints,
+            _stableSwapFeeBasisPoints,
+            _marginFeeBasisPoints,
+            _liquidationFeeUsd
+        );
+    }
+
     function removeAdmin(address _token, address _account) external onlyAdmin {
         IYieldToken(_token).removeAdmin(_account);
     }
 
     function setIsAmmEnabled(address _priceFeed, bool _isEnabled) external onlyAdmin {
         IVaultPriceFeed(_priceFeed).setIsAmmEnabled(_isEnabled);
+    }
+
+    function setIsSecondaryPriceEnabled(address _priceFeed, bool _isEnabled) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setIsSecondaryPriceEnabled(_isEnabled);
     }
 
     function setMaxStrictPriceDeviation(address _priceFeed, uint256 _maxStrictPriceDeviation) external onlyAdmin {

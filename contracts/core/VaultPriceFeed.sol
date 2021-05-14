@@ -4,20 +4,25 @@ import "../libraries/math/SafeMath.sol";
 
 import "./interfaces/IVaultPriceFeed.sol";
 import "../oracle/interfaces/IPriceFeed.sol";
+import "../oracle/interfaces/ISecondaryPriceFeed.sol";
 import "../amm/interfaces/IPancakePair.sol";
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 contract VaultPriceFeed is IVaultPriceFeed {
     using SafeMath for uint256;
 
     uint256 public constant PRICE_PRECISION = 10 ** 30;
+    uint256 public constant SECONDARY_PRICE_PRECISION = 10 ** 18;
     uint256 public constant ONE_USD = PRICE_PRECISION;
 
     address public gov;
     bool public isAmmEnabled = true;
+    bool public isSecondaryPriceEnabled = true;
     uint256 public priceSampleSpace = 3;
     uint256 public maxStrictPriceDeviation = 0;
+    address public secondaryPriceFeed;
 
     address public btc;
     address public eth;
@@ -50,6 +55,14 @@ contract VaultPriceFeed is IVaultPriceFeed {
 
     function setIsAmmEnabled(bool _isEnabled) external override onlyGov {
         isAmmEnabled = _isEnabled;
+    }
+
+    function setIsSecondaryPriceEnabled(bool _isEnabled) external override onlyGov {
+        isSecondaryPriceEnabled = _isEnabled;
+    }
+
+    function setSecondaryPriceFeed(address _secondaryPriceFeed) external onlyGov {
+        secondaryPriceFeed = _secondaryPriceFeed;
     }
 
     function setTokens(address _btc, address _eth, address _bnb) external onlyGov {
@@ -138,6 +151,18 @@ contract VaultPriceFeed is IVaultPriceFeed {
             }
         }
 
+        if (isSecondaryPriceEnabled) {
+            uint256 secondaryPrice = getSecondaryPrice(_token);
+            if (secondaryPrice > 0) {
+                if (_maximise && secondaryPrice > price) {
+                    price = secondaryPrice;
+                }
+                if (!_maximise && secondaryPrice < price) {
+                    price = secondaryPrice;
+                }
+            }
+        }
+
         if (strictStableTokens[_token]) {
             uint256 delta = price > ONE_USD ? price.sub(ONE_USD) : ONE_USD.sub(price);
             if (delta <= maxStrictPriceDeviation) {
@@ -146,6 +171,28 @@ contract VaultPriceFeed is IVaultPriceFeed {
         }
 
         return price;
+    }
+
+    function getSecondaryPrice(address _token) public view returns (uint256) {
+        if (_token == btc) {
+            return getSecondaryPriceFromSymbol("BTC");
+        }
+        if (_token == eth) {
+            return getSecondaryPriceFromSymbol("ETH");
+        }
+        if (_token == bnb) {
+            return getSecondaryPriceFromSymbol("BNB");
+        }
+        return 0;
+    }
+
+    function getSecondaryPriceFromSymbol(string memory _symbol) public view returns (uint256) {
+        if (secondaryPriceFeed == address(0)) {
+            return 0;
+        }
+
+        ISecondaryPriceFeed.ReferenceData memory data = ISecondaryPriceFeed(secondaryPriceFeed).getReferenceData(_symbol, "USD");
+        return data.rate.mul(PRICE_PRECISION).div(SECONDARY_PRICE_PRECISION);
     }
 
     function getAmmPrice(address _token) public override view returns (uint256) {

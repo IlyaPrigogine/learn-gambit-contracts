@@ -6,7 +6,14 @@ interface IVault {
     function setIsMintingEnabled(bool _isMintingEnabled) external;
     function setIsSwapEnabled(bool _isSwapEnabled) external;
 
-    function setPriceFeed(address _ammPriceFeed) external;
+    function setFees(
+        uint256 _swapFeeBasisPoints,
+        uint256 _stableSwapFeeBasisPoints,
+        uint256 _marginFeeBasisPoints,
+        uint256 _liquidationFeeUsd
+    ) external;
+
+    function setPriceFeed(address _priceFeed) external;
     function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external;
     function setMaxGasPrice(uint256 _maxGasPrice) external;
     function withdrawFees(address _token, address _receiver) external returns (uint256);
