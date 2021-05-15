@@ -45,9 +45,9 @@ contract Timelock {
         uint256 _marginFeeBasisPoints,
         uint256 _liquidationFeeUsd
     ) external onlyAdmin {
-        require(_swapFeeBasisPoints < 30, "Timelock: invalid _swapFeeBasisPoints");
-        require(_stableSwapFeeBasisPoints < 30, "Timelock: invalid _stableSwapFeeBasisPoints");
-        require(_marginFeeBasisPoints < 30, "Timelock: invalid _marginFeeBasisPoints");
+        require(_swapFeeBasisPoints < 100, "Timelock: invalid _swapFeeBasisPoints");
+        require(_stableSwapFeeBasisPoints < 100, "Timelock: invalid _stableSwapFeeBasisPoints");
+        require(_marginFeeBasisPoints < 100, "Timelock: invalid _marginFeeBasisPoints");
         require(_liquidationFeeUsd < 10 * PRICE_PRECISION, "Timelock: invalid _liquidationFeeUsd");
 
         IVault(_vault).setFees(
