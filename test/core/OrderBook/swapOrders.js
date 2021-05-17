@@ -108,7 +108,9 @@ describe("OrderBook, swap orders", function () {
         await btc.connect(user0).transfer(vault.address, expandDecimals(100, 8))
         await vault.directPoolDeposit(btc.address);
 
-        await bnb.mint(user0.address, expandDecimals(50000, 18))
+        await bnb.mint(user0.address, expandDecimals(100000, 18))
+        await bnb.connect(user0).approve(router.address, expandDecimals(50000, 18))
+
         await bnb.connect(user0).transfer(vault.address, expandDecimals(10000, 18))
         await vault.directPoolDeposit(bnb.address);
         // probably I'm doing something wrong? contract doesn't have enough funds 
@@ -126,7 +128,8 @@ describe("OrderBook, swap orders", function () {
             collateralToken: btc.address,
             collateralDelta: toUsd(BTC_PRICE),
             user: user0,
-            isLong: true
+            isLong: true,
+            shouldWrap: false
         };
     })
 
@@ -173,6 +176,7 @@ describe("OrderBook, swap orders", function () {
         props.triggerAboveThreshold = getDefault(props, 'triggerAboveThreshold', defaults.triggerAboveThreshold);
         props.executionFee = getDefault(props, 'executionFee', defaults.executionFee);
         props.value = getDefault(props, 'value', props.executionFee || defaults.executionFee);
+        props.shouldWrap = getDefault(props, 'shouldWrap', props.shouldWrap);
 
         const tx = await orderBook.connect(getDefault(props, 'user', defaults.user)).createSwapOrder(
             props.path,
@@ -181,6 +185,7 @@ describe("OrderBook, swap orders", function () {
             props.triggerRatio,
             props.triggerAboveThreshold,
             props.executionFee,
+            props.shouldWrap,
             {value: props.value}
         );
 
@@ -231,6 +236,12 @@ describe("OrderBook, swap orders", function () {
         }), 2).to.be.revertedWith("OrderBook: invalid _path.length");
 
         await expect(defaultCreateSwapOrder({
+            path: [btc.address, bnb.address],
+            triggerRatio: 1,
+            shouldWrap: true
+        })).to.be.revertedWith("OrderBook: only weth could be wrapped");
+
+        await expect(defaultCreateSwapOrder({
             path: [btc.address, btc.address],
             triggerRatio: 1
         }), 3).to.be.revertedWith("OrderBook: invalid _path");
@@ -278,6 +289,51 @@ describe("OrderBook, swap orders", function () {
         });
     });
 
+    it("createSwapOrder, WBNB -> DAI", async () => {
+        const triggerRatio = getTriggerRatio(toUsd(550), toUsd(1));
+        const amountIn = expandDecimals(10, 18);
+
+        await expect(defaultCreateSwapOrder({
+            path: [bnb.address, dai.address],
+            triggerRatio,
+            triggerAboveThreshold: false,
+            amountIn,
+            value: defaults.executionFee.sub(1)
+        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+
+        await expect(defaultCreateSwapOrder({
+            path: [bnb.address, dai.address],
+            triggerRatio,
+            triggerAboveThreshold: false,
+            amountIn,
+            value: defaults.executionFee.add(1)
+        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+
+        let tx, props;
+        [tx, props] = await defaultCreateSwapOrder({
+            path: [bnb.address, dai.address],
+            triggerRatio,
+            triggerAboveThreshold: false,
+            amountIn,
+            value: defaults.executionFee
+        });
+        reportGasUsed(provider, tx, "createSwapOrder");
+        const bnbBalance = await bnb.balanceOf(orderBook.address);
+        expect(bnbBalance).to.be.equal(defaults.executionFee.add(amountIn));
+
+        const order = await getCreatedSwapOrder(defaults.user.address);
+
+        validateOrderFields(order, {
+            account: defaults.user.address,
+            triggerRatio,
+            triggerAboveThreshold: false,
+            path: [dai.address, btc.address],
+            minOut: props.minOut,
+            executionFee: defaults.executionFee,
+            amountIn
+        });
+    });
+
     it("createSwapOrder, BNB -> DAI", async () => {
         const triggerRatio = getTriggerRatio(toUsd(550), toUsd(1));
         const amountIn = expandDecimals(10, 18);
@@ -288,6 +344,7 @@ describe("OrderBook, swap orders", function () {
             triggerRatio,
             triggerAboveThreshold: false,
             amountIn,
+            shouldWrap: true,
             value: value.sub(1)
         })).to.be.revertedWith("OrderBook: incorrect value transferred");
 
@@ -296,6 +353,7 @@ describe("OrderBook, swap orders", function () {
             triggerRatio,
             triggerAboveThreshold: false,
             amountIn,
+            shouldWrap: true,
             value: value.add(1)
         })).to.be.revertedWith("OrderBook: incorrect value transferred");
 
@@ -304,6 +362,7 @@ describe("OrderBook, swap orders", function () {
             path: [bnb.address, dai.address],
             triggerRatio,
             triggerAboveThreshold: false,
+            shouldWrap: true,
             amountIn,
             value
         });
@@ -378,6 +437,7 @@ describe("OrderBook, swap orders", function () {
             triggerRatio,
             triggerAboveThreshold: false,
             amountIn,
+            shouldWrap: true,
             value
         });
 
@@ -499,6 +559,7 @@ describe("OrderBook, swap orders", function () {
             path: path,
             minOut,
             triggerRatio,
+            shouldWrap: true,           
             triggerAboveThreshold: true,
             amountIn,
             value
@@ -553,6 +614,7 @@ describe("OrderBook, swap orders", function () {
             triggerRatio: triggerRatio2,
             triggerAboveThreshold: false,
             amountIn,
+            shouldWrap: true,
             value
         });
 

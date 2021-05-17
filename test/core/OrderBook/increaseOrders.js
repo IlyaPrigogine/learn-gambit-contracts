@@ -189,26 +189,34 @@ describe("OrderBook, increase position orders", function () {
 
     it("createIncreaseOrder, bad input", async () => {
         const lowExecutionFee = 100;
+        let counter = 0;
         await expect(defaultCreateIncreaseOrder({
             executionFee: lowExecutionFee
-        })).to.be.revertedWith("OrderBook: insufficient execution fee");
+        }), counter++).to.be.revertedWith("OrderBook: insufficient execution fee");
 
         const goodExecutionFee = expandDecimals(1, 8);
         await expect(defaultCreateIncreaseOrder({
             executionFee: goodExecutionFee,
             value: goodExecutionFee - 1
-        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+        }), counter++).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
         await expect(defaultCreateIncreaseOrder({
             executionFee: goodExecutionFee,
             value: goodExecutionFee + 1
-        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+        }), counter++).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
 
         await expect(defaultCreateIncreaseOrder({
             path: [bnb.address],
             executionFee: goodExecutionFee,
             value: expandDecimals(10, 8).add(goodExecutionFee).sub(1),
             shouldWrap: true
-        })).to.be.revertedWith("OrderBook: incorrect value transferred");
+        }), counter++).to.be.revertedWith("OrderBook: incorrect value transferred");
+
+        await expect(defaultCreateIncreaseOrder({
+            path: [btc.address],
+            executionFee: goodExecutionFee,
+            value: expandDecimals(10, 8).add(goodExecutionFee),
+            shouldWrap: true
+        }), counter++).to.be.revertedWith("OrderBook: only weth could be wrapped");
 
         await expect(defaultCreateIncreaseOrder({
             path: [bnb.address] ,
@@ -216,17 +224,17 @@ describe("OrderBook, increase position orders", function () {
             amountIn: expandDecimals(10, 8),
             value: expandDecimals(10, 8).add(goodExecutionFee),
             shouldWrap: false
-        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
+        }), counter++).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
 
         await expect(defaultCreateIncreaseOrder({
             path: [dai.address],
             amountIn: expandDecimals(4, 18)
-        })).to.be.revertedWith("OrderBook: insufficient collateral");
+        }), counter++).to.be.revertedWith("OrderBook: insufficient collateral");
 
         await expect(defaultCreateIncreaseOrder({
             path: [dai.address, btc.address, bnb.address, btc.address],
             amountIn: expandDecimals(4, 18)
-        })).to.be.revertedWith("OrderBook: invalid _path.length");
+        }), counter++).to.be.revertedWith("OrderBook: invalid _path.length");
     });
 
     it("createIncreaseOrder, two orders", async () => {

@@ -251,7 +251,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _minOut,
         uint256 _triggerRatio, // tokenB / tokenA
         bool _triggerAboveThreshold,
-        uint256 _executionFee
+        uint256 _executionFee,
+        bool _shouldWrap
     ) external payable nonReentrant {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
@@ -260,11 +261,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
 
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
-        if (_path[0] == weth) {
+        if (_shouldWrap) {
+            require(_path[0] == weth, "OrderBook: only weth could be wrapped");
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
         } else {
-            IRouter(router).pluginTransfer(_path[0], msg.sender, address(this), _amountIn);
             require(msg.value == _executionFee, "OrderBook: incorrect execution fee transferred");
+            IRouter(router).pluginTransfer(_path[0], msg.sender, address(this), _amountIn);
         }
 
         _createSwapOrder(msg.sender, _path, _amountIn, _minOut, _triggerRatio, _triggerAboveThreshold, _executionFee);
@@ -442,7 +444,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         _transferInETH();
 
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
-        if (_path[0] == weth && _shouldWrap) {
+        if (_shouldWrap) {
+            require(_path[0] == weth, "OrderBook: only weth could be wrapped");
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
         } else {
             require(msg.value == _executionFee, "OrderBook: incorrect execution fee transferred");
