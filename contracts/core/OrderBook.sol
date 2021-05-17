@@ -329,18 +329,17 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
     }
 
-    function validateSwapOrderPrice(
+    function validateSwapOrderPriceWithTriggerAboveThreshold(
         address _tokenA,
         address _tokenB,
         uint256 _triggerRatio,
-        bool _triggerAboveThreshold,
         bool _raise
     ) public view returns (bool) {
         uint256 tokenAPrice = IVault(vault).getMinPrice(_tokenA);
         uint256 tokenBPrice = IVault(vault).getMaxPrice(_tokenB);
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
 
-        bool isValid = _triggerAboveThreshold ? currentRatio > _triggerRatio : currentRatio < _triggerRatio;
+        bool isValid = currentRatio > _triggerRatio;
         if (_raise) {
             require(isValid, "OrderBook: invalid price for execution");
         }
@@ -374,11 +373,10 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         if (order.triggerAboveThreshold) {
             // gas optimisation
             // order.minAmount should prevent wrong price execution in case of simple limit order
-            validateSwapOrderPrice(
+            validateSwapOrderPriceWithTriggerAboveThreshold(
                 order.path[0],
                 order.path[1],
                 order.triggerRatio,
-                order.triggerAboveThreshold,
                 true
             );
         }
@@ -412,13 +410,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
 
     function validatePositionOrderPrice(
-        bool _triggerAboveThreshold, 
+        bool _triggerAboveThreshold,
         uint256 _triggerPrice, 
         address _indexToken,
+        bool _maximisePrice,
         bool _raise
     ) public view returns (uint256, bool) {
-        uint256 currentPrice = _triggerAboveThreshold 
-            ? IVault(vault).getMinPrice(_indexToken) : IVault(vault).getMaxPrice(_indexToken);
+        uint256 currentPrice = _maximisePrice
+            ? IVault(vault).getMaxPrice(_indexToken) : IVault(vault).getMinPrice(_indexToken);
         bool isPriceValid = _triggerAboveThreshold ? currentPrice > _triggerPrice : currentPrice < _triggerPrice;
         if (_raise) {
             require(isPriceValid, "OrderBook: invalid price for execution");
@@ -562,7 +561,16 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     function executeIncreaseOrder(address _address, uint256 _orderIndex, address payable _feeReceiver) external nonReentrant {
         IncreaseOrder memory order = increaseOrders[_address][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
-        (uint256 currentPrice, ) = validatePositionOrderPrice(order.triggerAboveThreshold, order.triggerPrice, order.indexToken, true);
+
+        // increase long should use max price
+        // increase short should use min price
+        (uint256 currentPrice, ) = validatePositionOrderPrice(
+            order.triggerAboveThreshold,
+            order.triggerPrice,
+            order.indexToken,
+            order.isLong,
+            true
+        );
 
         delete increaseOrders[_address][_orderIndex];
 
@@ -670,7 +678,15 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         DecreaseOrder memory order = decreaseOrders[_address][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
 
-        (uint256 currentPrice, ) = validatePositionOrderPrice(order.triggerAboveThreshold, order.triggerPrice, order.indexToken, true);
+        // decrease long should use min price
+        // decrease short should use max price
+        (uint256 currentPrice, ) = validatePositionOrderPrice(
+            order.triggerAboveThreshold,
+            order.triggerPrice, 
+            order.indexToken,
+            !order.isLong,
+            true
+        );
 
         delete decreaseOrders[_address][_orderIndex];
 

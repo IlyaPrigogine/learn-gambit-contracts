@@ -266,7 +266,51 @@ describe("OrderBook, decrease position orders", () => {
         expect(order2.sizeDelta).to.be.equal(toUsd(2));
     });
 
-    it("Execute decrease order, incorrect", async () => {
+    it("Execute decrease order, invalid price", async () => {
+        await vaultPriceFeed.setPriceSampleSpace(2);
+        let triggerPrice, isLong, triggerAboveThreshold, newBtcPrice;
+        let orderIndex = 0;
+
+        // decrease long should use min price
+        // decrease short should use max price
+        for ([triggerPrice, isLong, triggerAboveThreshold, newBtcPrice, setPriceTwice] of [
+            [expandDecimals(BTC_PRICE - 1000, 30), true, false, BTC_PRICE - 1050, false],
+            [expandDecimals(BTC_PRICE + 1000, 30), true, true, BTC_PRICE + 1050, true],
+            [expandDecimals(BTC_PRICE - 1000, 30), false, false, BTC_PRICE - 1050, true],
+            [expandDecimals(BTC_PRICE + 1000, 30), false, true, BTC_PRICE + 1050, false]
+        ]) {
+            // "reset" BTC price
+            await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE));
+            await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE));
+
+            await defaultCreateDecreaseOrder({
+                triggerPrice,
+                triggerAboveThreshold,
+                isLong
+            });
+
+            const order = await orderBook.decreaseOrders(defaults.user.address, orderIndex);
+            await expect(orderBook.executeDecreaseOrder(order.account, orderIndex, user1.address), 1)
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+
+            if (setPriceTwice) {
+                // on first price update all limit orders are still invalid
+                btcPriceFeed.setLatestAnswer(toChainlinkPrice(newBtcPrice));
+                await expect(orderBook.executeDecreaseOrder(order.account, orderIndex, user1.address), 2)
+                    .to.be.revertedWith("OrderBook: invalid price for execution");
+            }
+
+            // now both min and max prices satisfies requirement
+            btcPriceFeed.setLatestAnswer(toChainlinkPrice(newBtcPrice));
+            await expect(orderBook.executeDecreaseOrder(order.account, orderIndex, user1.address), 3)
+                .to.not.be.revertedWith("OrderBook: invalid price for execution");
+            // so we are sure we passed price validations inside OrderBook
+
+            orderIndex++;
+        }
+    })
+
+    it("Execute decrease order, non-existent", async () => {
         await defaultCreateDecreaseOrder({
             triggerPrice: toUsd(BTC_PRICE - 1000),
             triggerAboveThreshold: false
@@ -274,9 +318,6 @@ describe("OrderBook, decrease position orders", () => {
 
         await expect(orderBook.executeDecreaseOrder(defaults.user.address, 1, user1.address))
             .to.be.revertedWith("OrderBook: non-existent order");
-
-        await expect(orderBook.executeDecreaseOrder(defaults.user.address, 0, user1.address))
-            .to.be.revertedWith("OrderBook: invalid price for execution");
     });
 
     it("Execute decrease order, long", async () => {

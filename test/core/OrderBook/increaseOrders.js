@@ -447,22 +447,46 @@ describe("OrderBook, increase position orders", function () {
     });
 
     it("executeOrder, current price is invalid", async () => {
-        const order1Index = 0
-        await defaultCreateIncreaseOrder({triggerPrice: expandDecimals(BTC_PRICE + 1000, 30)});
-        const orderA = await orderBook.increaseOrders(defaults.user.address, order1Index);
+        let triggerPrice, isLong, triggerAboveThreshold, newBtcPrice;
+        let orderIndex = 0;
 
-        await expect(orderBook.executeIncreaseOrder(orderA.account, order1Index, user1.address))
-            .to.be.revertedWith("OrderBook: invalid price for execution");
+        // increase long should use max price
+        // increase short should use min price
+        for ([triggerPrice, isLong, collateralToken, triggerAboveThreshold, newBtcPrice, setPriceTwice] of [
+            [expandDecimals(BTC_PRICE - 1000, 30), true, btc.address, false, BTC_PRICE - 1050, true],
+            [expandDecimals(BTC_PRICE + 1000, 30), true, btc.address, true, BTC_PRICE + 1050, false],
+            [expandDecimals(BTC_PRICE - 1000, 30), false, dai.address, false, BTC_PRICE - 1050, false],
+            [expandDecimals(BTC_PRICE + 1000, 30), false, dai.address, true, BTC_PRICE + 1050, true]
+        ]) {
+            await vaultPriceFeed.setPriceSampleSpace(2);
 
-        await defaultCreateIncreaseOrder({
-            triggerPrice: expandDecimals(BTC_PRICE - 1000, 30),
-            isLong: false,
-            triggerAboveThreshold: false
-        });
-        const order2Index = 1;
-        const orderB = await orderBook.increaseOrders(defaults.user.address, order2Index);
-        await expect(orderBook.executeIncreaseOrder(orderB.account, order2Index, user1.address))
-            .to.be.revertedWith("OrderBook: invalid price for execution");
+            // "reset" BTC price
+            await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE));
+            await btcPriceFeed.setLatestAnswer(toChainlinkPrice(BTC_PRICE));
+
+            await defaultCreateIncreaseOrder({
+                triggerPrice,
+                isLong,
+                triggerAboveThreshold,
+                collateralToken
+            });
+            const order = await orderBook.increaseOrders(defaults.user.address, orderIndex);
+            await expect(orderBook.executeIncreaseOrder(order.account, orderIndex, user1.address))
+                .to.be.revertedWith("OrderBook: invalid price for execution");
+
+            if (setPriceTwice) {
+                // in this case on first price order is still non-executable because of current price
+                btcPriceFeed.setLatestAnswer(toChainlinkPrice(newBtcPrice));
+                await expect(orderBook.executeIncreaseOrder(order.account, orderIndex, user1.address))
+                    .to.be.revertedWith("OrderBook: invalid price for execution");
+            }
+
+            // now both min and max prices satisfies requirement
+            btcPriceFeed.setLatestAnswer(toChainlinkPrice(newBtcPrice));
+            await orderBook.executeIncreaseOrder(order.account, orderIndex, user1.address);
+
+            orderIndex++;
+        }
     });
 
     it("executeOrder, long, purchase token same as collateral", async () => {
