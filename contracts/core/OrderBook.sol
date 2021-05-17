@@ -435,19 +435,17 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         bool _isLong,
         uint256 _triggerPrice,
         bool _triggerAboveThreshold,
-        uint256 _executionFee
+        uint256 _executionFee,
+        bool _shouldWrap
     ) external payable nonReentrant {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
-        if (_path[0] == weth) {
+        if (_path[0] == weth && _shouldWrap) {
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
         } else {
             require(msg.value == _executionFee, "OrderBook: incorrect execution fee transferred");
-        }
-
-        if (_path[0] != weth) {
             IRouter(router).pluginTransfer(_path[0], msg.sender, address(this), _amountIn);
         }
 
@@ -461,8 +459,10 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _purchaseTokenAmount = _amountIn;
         }
 
-        uint256 _purchaseTokenAmountUsd = IVault(vault).tokenToUsdMin(_purchaseToken, _purchaseTokenAmount);
-        require(_purchaseTokenAmountUsd > minPurchaseTokenAmountUsd, "OrderBook: insufficient collateral");
+        {
+            uint256 _purchaseTokenAmountUsd = IVault(vault).tokenToUsdMin(_purchaseToken, _purchaseTokenAmount);
+            require(_purchaseTokenAmountUsd > minPurchaseTokenAmountUsd, "OrderBook: insufficient collateral");
+        }
 
         _createIncreaseOrder(
             msg.sender,

@@ -24,7 +24,7 @@ describe("OrderBook, increase position orders", function () {
     - [x] revert if fee + amountIn  != transferred BNB (if WETH)
     - [x] transfer execution fee
     - [x] transfer token to OrderBook (if transfer token != WETH)
-    - [x] transfer execution fee + amoint with BNB (if WETH)
+    - [x] transfer execution fee + amount with BNB (if WETH)
     - [x] swap tokens if path.length > 1
     - [x] revert if path.length > 3
     - [x] revert if transferred collateral usd is too low
@@ -134,6 +134,9 @@ describe("OrderBook, increase position orders", function () {
         await dai.mint(user0.address, expandDecimals(10000000, 18))
         await dai.connect(user0).approve(router.address, expandDecimals(1000000, 18))
 
+        await bnb.mint(user0.address, expandDecimals(10000000, 18))
+        await bnb.connect(user0).approve(router.address, expandDecimals(1000000, 18))
+
         await dai.mint(user0.address, expandDecimals(20000000, 18))
         await dai.connect(user0).transfer(vault.address, expandDecimals(2000000, 18))
         await vault.directPoolDeposit(dai.address);
@@ -157,7 +160,8 @@ describe("OrderBook, increase position orders", function () {
             collateralToken: btc.address,
             collateralDelta: toUsd(BTC_PRICE),
             user: user0,
-            isLong: true
+            isLong: true,
+            shouldWrap: false
         };
     });
 
@@ -178,6 +182,7 @@ describe("OrderBook, increase position orders", function () {
             getDefault(props, 'triggerPrice', defaults.triggerPrice),
             getDefault(props, 'triggerAboveThreshold', defaults.triggerAboveThreshold),
             getDefault(props, 'executionFee', defaults.executionFee),
+            getDefault(props, 'shouldWrap', defaults.shouldWrap),
             {value: getDefault(props, 'value', props.executionFee || defaults.executionFee)}
         );
     }
@@ -201,8 +206,17 @@ describe("OrderBook, increase position orders", function () {
         await expect(defaultCreateIncreaseOrder({
             path: [bnb.address],
             executionFee: goodExecutionFee,
-            value: expandDecimals(10, 8).add(goodExecutionFee).sub(1)
+            value: expandDecimals(10, 8).add(goodExecutionFee).sub(1),
+            shouldWrap: true
         })).to.be.revertedWith("OrderBook: incorrect value transferred");
+
+        await expect(defaultCreateIncreaseOrder({
+            path: [bnb.address] ,
+            executionFee: goodExecutionFee,
+            amountIn: expandDecimals(10, 8),
+            value: expandDecimals(10, 8).add(goodExecutionFee),
+            shouldWrap: false
+        })).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
 
         await expect(defaultCreateIncreaseOrder({
             path: [dai.address],
@@ -236,6 +250,38 @@ describe("OrderBook, increase position orders", function () {
         expect(order2.sizeDelta).to.be.equal(sizeDelta2);
     });
 
+    it("createIncreaseOrder, pay WETH", async () => {
+        const bnbBalanceBefore = await bnb.balanceOf(orderBook.address);
+        const amountIn = expandDecimals(30, 18);
+        const value = defaults.executionFee;
+        const tx = await defaultCreateIncreaseOrder({
+            path: [bnb.address],
+            amountIn,
+            value,
+            shouldWrap: false
+        });
+
+        reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
+
+        const order = await getCreatedIncreaseOrder(user0.address);
+        const bnbBalanceAfter = await bnb.balanceOf(orderBook.address);
+
+        const bnbBalanceDiff = bnbBalanceAfter.sub(bnbBalanceBefore);
+        expect(bnbBalanceDiff, 'BNB balance').to.be.equal(amountIn.add(defaults.executionFee));
+
+        validateOrderFields(order, {
+            account: defaults.user.address,
+            purchaseToken: bnb.address,
+            purchaseTokenAmount: amountIn,
+            indexToken: btc.address,
+            sizeDelta: defaults.sizeDelta,
+            isLong: true,
+            triggerPrice: defaults.triggerPrice,
+            triggerAboveThreshold: true,
+            executionFee: defaults.executionFee
+        });
+    });
+
     it("createIncreaseOrder, pay BNB", async () => {
         const bnbBalanceBefore = await bnb.balanceOf(orderBook.address);
         const amountIn = expandDecimals(30, 18);
@@ -243,7 +289,8 @@ describe("OrderBook, increase position orders", function () {
         const tx = await defaultCreateIncreaseOrder({
             path: [bnb.address],
             amountIn,
-            value
+            value,
+            shouldWrap: true
         });
 
         reportGasUsed(provider, tx, 'createIncreaseOrder gas used');
@@ -425,7 +472,8 @@ describe("OrderBook, increase position orders", function () {
         const tx1 = await defaultCreateIncreaseOrder({
             path: [bnb.address],
             amountIn,
-            value
+            value,
+            shouldWrap: true
         });
         let txFees = await getTxFees(provider, tx1);
 
@@ -611,7 +659,8 @@ describe("OrderBook, increase position orders", function () {
             collateralToken: dai.address,
             isLong: false,
             triggerboveThreshold: true,
-            triggerPrice: expandDecimals(BNB_PRICE - 10, 30)
+            triggerPrice: expandDecimals(BNB_PRICE - 10, 30),
+            shouldWrap: true
         });
 
         const order = await orderBook.increaseOrders(defaults.user.address, 0);
