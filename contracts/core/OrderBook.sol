@@ -23,7 +23,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
     struct IncreaseOrder {
         address account;
-        uint256 index;
         address purchaseToken;
         uint256 purchaseTokenAmount;
         address collateralToken;
@@ -36,7 +35,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
     struct DecreaseOrder {
         address account;
-        uint256 index;
         address collateralToken;
         uint256 collateralDelta;
         address indexToken;
@@ -48,7 +46,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
     struct SwapOrder {
         address account;
-        uint256 index;
         address[] path;
         uint256 amountIn;
         uint256 minOut;
@@ -255,7 +252,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _triggerRatio, // tokenB / tokenA
         bool _triggerAboveThreshold,
         uint256 _executionFee
-    ) external payable {
+    ) external payable nonReentrant {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
@@ -285,7 +282,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _orderIndex = swapOrdersIndex[_account];
         SwapOrder memory order = SwapOrder(
             _account,
-            _orderIndex,
             _path,
             _amountIn,
             _minOut,
@@ -334,24 +330,24 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
 
     function validateSwapOrderPrice(
-        address tokenA,
-        address tokenB,
-        uint256 triggerRatio,
-        bool triggerAboveThreshold,
-        bool raise
+        address _tokenA,
+        address _tokenB,
+        uint256 _triggerRatio,
+        bool _triggerAboveThreshold,
+        bool _raise
     ) public view returns (bool) {
-        uint256 tokenAPrice = IVault(vault).getMinPrice(tokenA);
-        uint256 tokenBPrice = IVault(vault).getMaxPrice(tokenB);
+        uint256 tokenAPrice = IVault(vault).getMinPrice(_tokenA);
+        uint256 tokenBPrice = IVault(vault).getMaxPrice(_tokenB);
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
 
-        bool isValid = triggerAboveThreshold ? currentRatio > triggerRatio : currentRatio < triggerRatio;
-        if (raise) {
+        bool isValid = _triggerAboveThreshold ? currentRatio > _triggerRatio : currentRatio < _triggerRatio;
+        if (_raise) {
             require(isValid, "OrderBook: invalid price for execution");
         }
         return isValid;
     }
 
-    function updateSwapOrder(uint256 _orderIndex, uint256 _minOut, uint256 _triggerRatio, bool _triggerAboveThreshold) external {
+    function updateSwapOrder(uint256 _orderIndex, uint256 _minOut, uint256 _triggerRatio, bool _triggerAboveThreshold) external nonReentrant {
         SwapOrder storage order = swapOrders[msg.sender][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
 
@@ -419,12 +415,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         bool _triggerAboveThreshold, 
         uint256 _triggerPrice, 
         address _indexToken,
-        bool raise
+        bool _raise
     ) public view returns (uint256, bool) {
         uint256 currentPrice = _triggerAboveThreshold 
             ? IVault(vault).getMinPrice(_indexToken) : IVault(vault).getMaxPrice(_indexToken);
         bool isPriceValid = _triggerAboveThreshold ? currentPrice > _triggerPrice : currentPrice < _triggerPrice;
-        if (raise) {
+        if (_raise) {
             require(isPriceValid, "OrderBook: invalid price for execution");
         }
         return (currentPrice, isPriceValid);
@@ -441,7 +437,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _triggerPrice,
         bool _triggerAboveThreshold,
         uint256 _executionFee
-    ) external payable {
+    ) external payable nonReentrant {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
@@ -498,7 +494,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _orderIndex = increaseOrdersIndex[msg.sender];
         IncreaseOrder memory order = IncreaseOrder(
             _account,
-            _orderIndex,
             _purchaseToken,
             _purchaseTokenAmount,
             _collateralToken,
@@ -526,7 +521,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
     }
 
-    function updateIncreaseOrder(uint256 _orderIndex, uint256 _sizeDelta, uint256 _triggerPrice, bool _triggerAboveThreshold) external {
+    function updateIncreaseOrder(uint256 _orderIndex, uint256 _sizeDelta, uint256 _triggerPrice, bool _triggerAboveThreshold) external nonReentrant {
         IncreaseOrder storage order = increaseOrders[msg.sender][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
 
@@ -552,7 +547,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
         emit CancelIncreaseOrder(
             order.account,
-            order.index,
+            _orderIndex,
             order.purchaseToken,
             order.purchaseTokenAmount,
             order.indexToken,
@@ -589,7 +584,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
         emit ExecuteIncreaseOrder(
             order.account,
-            order.index,
+            _orderIndex,
             order.purchaseToken,
             order.purchaseTokenAmount,
             order.indexToken,
@@ -611,7 +606,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _triggerPrice,
         bool _triggerAboveThreshold,
         uint256 _executionFee
-    ) external payable {
+    ) external payable nonReentrant {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
@@ -645,7 +640,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _orderIndex = decreaseOrdersIndex[_account];
         DecreaseOrder memory order = DecreaseOrder(
             _account,
-            _orderIndex,
             _collateralToken,
             _collateralDelta,
             _indexToken,
@@ -702,7 +696,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
         emit ExecuteDecreaseOrder(
             order.account,
-            order.index,
+            _orderIndex,
             order.collateralToken,
             order.collateralDelta,
             order.indexToken,
@@ -724,7 +718,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
         emit CancelDecreaseOrder(
             order.account,
-            order.index,
+            _orderIndex,
             order.collateralToken,
             order.collateralDelta,
             order.indexToken,
@@ -742,7 +736,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _sizeDelta, 
         uint256 _triggerPrice, 
         bool _triggerAboveThreshold
-    ) external {
+    ) external nonReentrant {
         DecreaseOrder storage order = decreaseOrders[msg.sender][_orderIndex];
         require(order.account != address(0), "OrderBook: non-existent order");
 
