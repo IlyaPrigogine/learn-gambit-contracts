@@ -356,6 +356,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 tokenBPrice;
 
         if (tokenA == usdg) {
+            // with both _path.length == 2 or 3 we need usdg price against _path[1]
             tokenAPrice = getUsdgMinPrice(_path[1]);
         } else {
             tokenAPrice = IVault(vault).getMinPrice(tokenA);

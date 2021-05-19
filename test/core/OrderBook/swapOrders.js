@@ -760,7 +760,6 @@ describe("OrderBook, swap orders", function () {
         expect(order.account).to.be.equal(ZERO_ADDRESS);
     });
 
-    // TODO check minOut
     it("executeSwapOrder, triggerAboveThreshold == true, USDG -> BNB -> BTC", async () => {
         const triggerRatio = getTriggerRatio(toUsd(1), toUsd(62000));
         const amountIn = expandDecimals(1000, 18);
@@ -810,6 +809,60 @@ describe("OrderBook, swap orders", function () {
 
         const userBtcBalanceAfter = await btc.balanceOf(defaults.user.address);
         expect(userBtcBalanceAfter.gt(userBtcBalanceBefore.add(minOut)), 'userBtcBalanceAfter').to.be.true;
+
+        const order = await getCreatedSwapOrder(defaults.user.address, 0);
+        expect(order.account).to.be.equal(ZERO_ADDRESS);
+    });
+
+    it("executeSwapOrder, triggerAboveThreshold == true, BTC -> USDG", async () => {
+        const triggerRatio = getTriggerRatio(toUsd(62000), toUsd(1));
+        const amountIn = expandDecimals(1, 6); // 0.01 BTC
+        const path = [btc.address, usdg.address];
+        const value = defaults.executionFee;
+
+        // minOut is not mandatory for such orders but with minOut it's possible to limit max price
+        // e.g. user would not be happy if he sets order "buy if BTC > $65000" and order executes with $75000
+        const minOut = await getMinOut(
+            getTriggerRatio(toUsd(60000), toUsd(1)),
+            path,
+            amountIn
+        );
+
+        await defaultCreateSwapOrder({
+            path,
+            minOut,
+            triggerRatio,
+            triggerAboveThreshold: true,
+            amountIn,
+            value
+        });
+
+        const executor = user1;
+
+        await expect(orderBook.executeSwapOrder(defaults.user.address, 2, executor.address))
+            .to.be.revertedWith("OrderBook: non-existent order");
+
+        btcPriceFeed.setLatestAnswer(toChainlinkPrice(63000));
+        await expect(orderBook.executeSwapOrder(defaults.user.address, 0, executor.address))
+            .to.be.revertedWith("OrderBook: invalid price for execution");
+
+        btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000));
+        await expect(orderBook.executeSwapOrder(defaults.user.address, 0, executor.address))
+            .to.be.revertedWith("OrderBook: insufficient amountOut");
+
+        btcPriceFeed.setLatestAnswer(toChainlinkPrice(61000));
+
+        const executorBalanceBefore = await executor.getBalance();
+        const userUsdgBalanceBefore = await usdg.balanceOf(defaults.user.address);
+
+        const tx = await orderBook.executeSwapOrder(defaults.user.address, 0, executor.address);
+        reportGasUsed(provider, tx, 'executeSwapOrder');
+
+        const executorBalanceAfter = await user1.getBalance();
+        expect(executorBalanceAfter, 'executorBalanceAfter').to.be.equal(executorBalanceBefore.add(defaults.executionFee));
+
+        const userUsdgBalanceAfter = await usdg.balanceOf(defaults.user.address);
+        expect(userUsdgBalanceAfter.gt(userUsdgBalanceBefore.add(minOut)), 'userUsdgBalanceAfter').to.be.true;
 
         const order = await getCreatedSwapOrder(defaults.user.address, 0);
         expect(order.account).to.be.equal(ZERO_ADDRESS);
