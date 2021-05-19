@@ -20,6 +20,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     using Address for address payable;
 
     uint256 public constant PRICE_PRECISION = 10 ** 30;
+    uint256 public constant USDG_DECIMALS = 10 ** 18;
 
     struct IncreaseOrder {
         address account;
@@ -331,14 +332,41 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
     }
 
+    function getUsdgMinPrice(address _otherToken) public view returns (uint256) {
+        // USDG_DECIMALS is same as 1 USDG
+        uint256 redemptionAmount = IVault(vault).getRedemptionAmount(_otherToken, USDG_DECIMALS);
+        uint256 otherTokenPrice = IVault(vault).getMaxPrice(_otherToken);
+
+        uint256 otherTokenDecimals = IVault(vault).tokenDecimals(_otherToken);
+        return redemptionAmount.mul(otherTokenPrice).div(10 ** otherTokenDecimals);
+    }
+
+    function getUsdgMaxPrice() public pure returns (uint256) {
+        return 1 * PRICE_PRECISION;
+    }
+
     function validateSwapOrderPriceWithTriggerAboveThreshold(
-        address _tokenA,
-        address _tokenB,
+        address[] memory _path,
         uint256 _triggerRatio,
         bool _raise
     ) public view returns (bool) {
-        uint256 tokenAPrice = IVault(vault).getMinPrice(_tokenA);
-        uint256 tokenBPrice = IVault(vault).getMaxPrice(_tokenB);
+        address tokenA = _path[0];
+        address tokenB = _path[_path.length - 1];
+        uint256 tokenAPrice;
+        uint256 tokenBPrice;
+
+        if (tokenA == usdg) {
+            tokenAPrice = getUsdgMinPrice(_path[1]);
+        } else {
+            tokenAPrice = IVault(vault).getMinPrice(tokenA);
+        }
+
+        if (tokenB == usdg) {
+            tokenBPrice = getUsdgMaxPrice();
+        } else {
+            tokenBPrice = IVault(vault).getMaxPrice(tokenB);
+        }
+
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
 
         bool isValid = currentRatio > _triggerRatio;
@@ -376,8 +404,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             // gas optimisation
             // order.minAmount should prevent wrong price execution in case of simple limit order
             validateSwapOrderPriceWithTriggerAboveThreshold(
-                order.path[0],
-                order.path[1],
+                order.path,
                 order.triggerRatio,
                 true
             );
