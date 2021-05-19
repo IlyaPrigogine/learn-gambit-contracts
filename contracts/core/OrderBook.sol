@@ -335,7 +335,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     function getUsdgMinPrice(address _otherToken) public view returns (uint256) {
         // USDG_DECIMALS is same as 1 USDG
         uint256 redemptionAmount = IVault(vault).getRedemptionAmount(_otherToken, USDG_DECIMALS);
-        uint256 otherTokenPrice = IVault(vault).getMaxPrice(_otherToken);
+        uint256 otherTokenPrice = IVault(vault).getMinPrice(_otherToken);
 
         uint256 otherTokenDecimals = IVault(vault).tokenDecimals(_otherToken);
         return redemptionAmount.mul(otherTokenPrice).div(10 ** otherTokenDecimals);
