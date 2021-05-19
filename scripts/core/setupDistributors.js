@@ -13,23 +13,23 @@ async function main() {
     {
       farm: usdg,
       yieldTrackerIndex: 0,
-      transferAmount: "22.0"
+      transferAmount: "80.0"
     },
     {
       farm: xgmt,
       yieldTrackerIndex: 0,
-      transferAmount: "22.0"
+      transferAmount: "80.0"
     },
     {
       farm: gmtUsdgFarm,
       yieldTrackerIndex: 1,
-      transferAmount: "12.0",
+      transferAmount: "5.0",
       shouldClaim: true
     },
     {
       farm: xgmtUsdgFarm,
       yieldTrackerIndex: 1,
-      transferAmount: "24.0",
+      transferAmount: "10.0",
       shouldClaim: true
     }
   ]
@@ -55,9 +55,9 @@ async function main() {
     const lastDistributionTime = await distributor.lastDistributionTime(yieldTracker0.address)
     console.log("lastDistributionTime", lastDistributionTime.toString())
 
-    // if (shouldClaim) {
-    //   await sendTxn(farm.claim("0x9f169c2189A2d975C18965DE985936361b4a9De9"), `farm.claim ${i}`)
-    // }
+    if (shouldClaim) {
+      await sendTxn(farm.claim("0x9f169c2189A2d975C18965DE985936361b4a9De9"), `farm.claim ${i}`)
+    }
     await sendTxn(wbnb.transfer(distributorAddress, convertedTransferAmount), `wbnb.transfer ${i}`)
     await sendTxn(distributor.setTokensPerInterval(yieldTrackerAddress, rewardsPerInterval), `distributor.setTokensPerInterval ${i}`)
   }

@@ -10,27 +10,27 @@ async function main() {
 
   const btc = {
     address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
-    amount: "0.0412"
+    amount: "0"
   }
   const eth = {
     address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-    amount: "5.6775"
+    amount: "0"
   }
   const bnb = {
     address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-    amount: "39.8377"
+    amount: "0"
   }
   const busd = {
     address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
-    amount: "10228.1919"
+    amount: "56000"
   }
   const usdc = {
     address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-    amount: "11095.6480"
+    amount: "0"
   }
   const usdt = {
     address: "0x55d398326f99059fF775485246999027B3197955",
-    amount: "1163.4386"
+    amount: "55000"
   }
 
   const tokens = [btc, eth, bnb, busd, usdc, usdt]
@@ -53,13 +53,15 @@ async function main() {
     const poolAmount = await vault.poolAmounts(token.address)
     const balance = await token.balanceOf(vault.address)
     if (poolAmount.gt(balance)) {
-      const amount = poolAmount.sub(balance).mul(110).div(100)
-      console.log("transfer", token.address, amount.toString())
-      await sendTxn(token.transfer(vault.address, amount), `token.transfer ${i}`)
+      // const amount = poolAmount.sub(balance).mul(110).div(100)
+      // console.log("transfer", token.address, amount.toString())
+      // await sendTxn(token.transfer(vault.address, amount), `token.transfer ${i}`)
     }
     const amount = ethers.utils.parseUnits(tokens[i].amount, tokenDecimals).div(2)
-    console.log("sending", token.address, amount.toString())
-    await sendTxn(router.directPoolDeposit(token.address, amount), `router.directPoolDeposit ${i}`)
+    if (amount.gt(0)) {
+      console.log("sending", token.address, amount.toString())
+      await sendTxn(router.directPoolDeposit(token.address, amount), `router.directPoolDeposit ${i}`)
+    }
   }
 }
 
