@@ -20,7 +20,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     using Address for address payable;
 
     uint256 public constant PRICE_PRECISION = 10 ** 30;
-    uint256 public constant USDG_DECIMALS = 10 ** 18;
+    uint256 public constant USDG_PRECISION = 10 ** 18;
 
     struct IncreaseOrder {
         address account;
@@ -333,8 +333,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
 
     function getUsdgMinPrice(address _otherToken) public view returns (uint256) {
-        // USDG_DECIMALS is same as 1 USDG
-        uint256 redemptionAmount = IVault(vault).getRedemptionAmount(_otherToken, USDG_DECIMALS);
+        // USDG_PRECISION is the same as 1 USDG
+        uint256 redemptionAmount = IVault(vault).getRedemptionAmount(_otherToken, USDG_PRECISION);
         uint256 otherTokenPrice = IVault(vault).getMinPrice(_otherToken);
 
         uint256 otherTokenDecimals = IVault(vault).tokenDecimals(_otherToken);
@@ -350,11 +350,19 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _triggerRatio,
         bool _raise
     ) public view returns (bool) {
+        // limit orders don't need this validation because minOut is enough
+        // so this validation handles scenarios for stop orders only
+        // when a user wants to swap when a price of tokenB increases relative to tokenA
         address tokenA = _path[0];
         address tokenB = _path[_path.length - 1];
         uint256 tokenAPrice;
         uint256 tokenBPrice;
 
+        // 1. USDG doesn't have a price feed so we need to calculate it based on redepmtion amount of a specific token
+        // That's why USDG price in USD can vary depending on the redepmtion token
+        // 2. In complex scenarios with path=[USDG, BNB, BTC] we need to know how much BNB we'll get for provided USDG
+        // to know how much BTC will be received 
+        // That's why in such scenario BNB should be used to determine price of USDG
         if (tokenA == usdg) {
             // with both _path.length == 2 or 3 we need usdg price against _path[1]
             tokenAPrice = getUsdgMinPrice(_path[1]);
