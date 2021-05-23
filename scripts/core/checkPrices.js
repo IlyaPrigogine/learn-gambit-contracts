@@ -2,7 +2,8 @@ const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
 async function main() {
-  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0xf0313A44bE7e39Da035Ec581998314520aE42749")
+  const vaultPriceFeed1 = await contractAt("VaultPriceFeed", "0xe700db0f0e609cc92ed521c0e956f8e915d9ac1b")
+  const vaultPriceFeed2 = await contractAt("VaultPriceFeed", "0xf0313A44bE7e39Da035Ec581998314520aE42749")
   const usdDecimals = 30
 
   const btc = {
@@ -34,10 +35,18 @@ async function main() {
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]
-    const maxPrice = await vaultPriceFeed.getPrice(token.address, true, true)
-    const minPrice = await vaultPriceFeed.getPrice(token.address, false, true)
-    console.log(`${token.symbol} max: ${ethers.utils.formatUnits(maxPrice, usdDecimals)}`)
-    console.log(`${token.symbol} min: ${ethers.utils.formatUnits(minPrice, usdDecimals)}`)
+    const maxPrice1 = await vaultPriceFeed1.getPrice(token.address, true, true)
+    const maxPrice2 = await vaultPriceFeed2.getPrice(token.address, true, true)
+    const minPrice1 = await vaultPriceFeed1.getPrice(token.address, false, true)
+    const minPrice2 = await vaultPriceFeed2.getPrice(token.address, false, true)
+    const diff1 = maxPrice1.sub(minPrice1)
+    const diff2 = maxPrice2.sub(minPrice2)
+    console.log(`${token.symbol} max1: ${ethers.utils.formatUnits(maxPrice1, usdDecimals)}`)
+    console.log(`${token.symbol} min1: ${ethers.utils.formatUnits(minPrice1, usdDecimals)}`)
+    console.log(`${token.symbol} diff1: ${ethers.utils.formatUnits(diff1, usdDecimals)}`)
+    console.log(`${token.symbol} max2: ${ethers.utils.formatUnits(maxPrice2, usdDecimals)}`)
+    console.log(`${token.symbol} min2: ${ethers.utils.formatUnits(minPrice2, usdDecimals)}`)
+    console.log(`${token.symbol} diff2: ${ethers.utils.formatUnits(diff2, usdDecimals)}`)
   }
 }
 
