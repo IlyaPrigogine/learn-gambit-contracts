@@ -14,7 +14,7 @@ async function main() {
   }
   const eth = {
     address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-    amount: "0"
+    amount: "17.64"
   }
   const bnb = {
     address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
@@ -22,7 +22,7 @@ async function main() {
   }
   const busd = {
     address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
-    amount: "56000"
+    amount: "0"
   }
   const usdc = {
     address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
@@ -30,34 +30,16 @@ async function main() {
   }
   const usdt = {
     address: "0x55d398326f99059fF775485246999027B3197955",
-    amount: "55000"
+    amount: "0"
   }
 
   const tokens = [btc, eth, bnb, busd, usdc, usdt]
-
-  // for (let i = 0; i < tokens.length; i++) {
-  //   const token = await contractAt("YieldToken", tokens[i].address)
-  //   const poolAmount = await vault.poolAmounts(token.address)
-  //   const feeReserve = await vault.feeReserves(token.address)
-  //   const balance = await token.balanceOf(vault.address)
-  //   const vaultAmount = poolAmount.add(feeReserve)
-  //   if (vaultAmount.gt(balance)) {
-  //     console.log(`${token.address}: vaultAmount.gt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${vaultAmount.sub(balance).toString()}`)
-  //   } else {
-  //     console.log(`${token.address}: vaultAmount.lt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${balance.sub(vaultAmount).toString()}`)
-  //   }
-  // }
 
   for (let i = 0; i < tokens.length; i++) {
     const token = await contractAt("YieldToken", tokens[i].address)
     const poolAmount = await vault.poolAmounts(token.address)
     const balance = await token.balanceOf(vault.address)
-    if (poolAmount.gt(balance)) {
-      // const amount = poolAmount.sub(balance).mul(110).div(100)
-      // console.log("transfer", token.address, amount.toString())
-      // await sendTxn(token.transfer(vault.address, amount), `token.transfer ${i}`)
-    }
-    const amount = ethers.utils.parseUnits(tokens[i].amount, tokenDecimals).div(2)
+    const amount = ethers.utils.parseUnits(tokens[i].amount, tokenDecimals)
     if (amount.gt(0)) {
       console.log("sending", token.address, amount.toString())
       await sendTxn(router.directPoolDeposit(token.address, amount), `router.directPoolDeposit ${i}`)

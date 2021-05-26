@@ -13,24 +13,22 @@ async function main() {
     {
       farm: usdg,
       yieldTrackerIndex: 0,
-      transferAmount: "80.0"
+      transferAmount: "70.0"
     },
     {
       farm: xgmt,
       yieldTrackerIndex: 0,
-      transferAmount: "80.0"
+      transferAmount: "70.0"
     },
     {
       farm: gmtUsdgFarm,
       yieldTrackerIndex: 1,
-      transferAmount: "5.0",
-      shouldClaim: true
+      transferAmount: "0.0"
     },
     {
       farm: xgmtUsdgFarm,
       yieldTrackerIndex: 1,
-      transferAmount: "10.0",
-      shouldClaim: true
+      transferAmount: "0.0"
     }
   ]
 
@@ -58,7 +56,9 @@ async function main() {
     if (shouldClaim) {
       await sendTxn(farm.claim("0x9f169c2189A2d975C18965DE985936361b4a9De9"), `farm.claim ${i}`)
     }
-    await sendTxn(wbnb.transfer(distributorAddress, convertedTransferAmount), `wbnb.transfer ${i}`)
+    if (convertedTransferAmount.gt(0)) {
+      await sendTxn(wbnb.transfer(distributorAddress, convertedTransferAmount), `wbnb.transfer ${i}`)
+    }
     await sendTxn(distributor.setTokensPerInterval(yieldTrackerAddress, rewardsPerInterval), `distributor.setTokensPerInterval ${i}`)
   }
 }

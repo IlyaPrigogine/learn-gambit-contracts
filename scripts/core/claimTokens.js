@@ -10,12 +10,13 @@ async function main() {
   const gmtUsdgPair = { address: "0xa41e57459f09a126F358E118b693789d088eA8A0" }
   const xgmtUsdgPair = { address: "0x0b622208fc0691C2486A3AE6B7C875b4A174b317" }
   const busdgUsdgPair = { address: "0x7Fea0c6022D81EE17146324E4F55f6A02E138Dab" }
+  const autoUsdgPair = { address: "0x0523FD5C53ea5419B4DAF656BC1b157dDFE3ce50" }
 
   const wbnbClaimableForXgmtPair = await xgmtYieldTracker.claimable(xgmtUsdgPair.address)
   console.log(`claimable: ${ethers.utils.formatUnits(wbnbClaimableForXgmtPair, 18)} WBNB`)
   await sendTxn(xgmt.recoverClaim(xgmtUsdgPair.address, receiver.address), "recoverClaim")
 
-  const accounts = [gmtUsdgPair, xgmtUsdgPair, busdgUsdgPair]
+  const accounts = [gmtUsdgPair, xgmtUsdgPair, busdgUsdgPair, autoUsdgPair]
 
   for (let i = 0; i < accounts.length; i++) {
     const account = accounts[i]

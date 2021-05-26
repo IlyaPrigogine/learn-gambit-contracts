@@ -85,6 +85,16 @@ contract Reader {
         return fundingRates;
     }
 
+    function getTokenSupply(IERC20 _token, address[] memory _excludedAccounts) public view returns (uint256) {
+        uint256 supply = _token.totalSupply();
+        for (uint256 i = 0; i < _excludedAccounts.length; i++) {
+            address account = _excludedAccounts[i];
+            uint256 balance = _token.balanceOf(account);
+            supply = supply.sub(balance);
+        }
+        return supply;
+    }
+
     function getTokenBalances(address _account, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory balances = new uint256[](_tokens.length);
         for (uint256 i = 0; i < _tokens.length; i++) {
