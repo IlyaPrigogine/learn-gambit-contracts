@@ -156,6 +156,24 @@ describe("Vault.liquidateLongPosition", function () {
     expect(await vault.guaranteedUsd(btc.address)).eq(0)
     expect(await vault.poolAmounts(btc.address)).eq(262756 - 219)
     expect(await btc.balanceOf(user2.address)).eq(11494) // 0.00011494 * 43500 => ~5
+
+    expect(await btc.balanceOf(vault.address)).eq(263506)
+
+    await vault.withdrawFees(btc.address, user0.address)
+
+    const balance = await btc.balanceOf(vault.address)
+    const poolAmount = await vault.poolAmounts(btc.address)
+    expect(poolAmount.sub(balance)).eq(206)
+
+    await btc.mint(vault.address, 1000)
+    await expect(vault.buyUSDG(btc.address, user1.address))
+      .to.be.revertedWith("Vault: invalid increase")
+
+    await usdg.connect(user1).transfer(vault.address, expandDecimals(1, 18))
+    await vault.sellUSDG(btc.address, user1.address)
+
+    await btc.mint(vault.address, 1000)
+    await vault.buyUSDG(btc.address, user1.address)
   })
 
   it("excludes AMM price", async () => {
