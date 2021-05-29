@@ -246,6 +246,27 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         gov = _gov;
     }
 
+    function getSwapOrder(address _account, uint256 _orderIndex) public view returns (
+        address, 
+        address,
+        address,
+        uint256,
+        uint256,
+        uint256,
+        bool
+    ) {
+        SwapOrder memory order = swapOrders[_account][_orderIndex];
+        return (
+            order.path.length > 0 ? order.path[0] : address(0), 
+            order.path.length > 1 ? order.path[1] : address(0), 
+            order.path.length > 2 ? order.path[2] : address(0), 
+            order.amountIn,
+            order.minOut,
+            order.triggerRatio,
+            order.triggerAboveThreshold
+        );
+    }
+
     function createSwapOrder(
         address[] memory _path,
         uint256 _amountIn,
