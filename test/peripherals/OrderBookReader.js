@@ -61,12 +61,19 @@ describe("OrderBookReader", function () {
     );
   }
 
-  function unflattenSwapOrders(swapOrders) {
-    const propsLength = 8;
-    const count = swapOrders.length / propsLength;
+  function unflattenSwapOrders([uintProps, addressProps]) {
+    const uintLength = 5;
+    const addressLength = 3;
+    const count = uintProps.length / uintLength;
+
     const ret = [];
     for (let i = 0; i < count; i++) {
-      ret.push(swapOrders.slice(propsLength * i, propsLength * (i+ 1)));
+      const order = addressProps
+        .slice(addressLength * i, addressLength * (i + 1))
+        .concat(
+          uintProps.slice(uintLength * i, uintLength * (i + 1))
+        );
+      ret.push(order);
     }
     return ret;
   }
@@ -77,12 +84,12 @@ describe("OrderBookReader", function () {
 
     const [order1, order2] = unflattenSwapOrders(await reader.getSwapOrders(orderBook.address, user0.address, 0, 2));
 
-    expect(order1[0].toHexString().toLowerCase()).to.be.equal(dai.address.toLowerCase());
-    expect(order1[1].toHexString().toLowerCase()).to.be.equal(btc.address.toLowerCase());
+    expect(order1[0]).to.be.equal(dai.address);
+    expect(order1[1]).to.be.equal(btc.address);
     expect(order1[7].toString()).to.be.equal('1');
 
-    expect(order2[0].toHexString().toLowerCase()).to.be.equal(dai.address.toLowerCase());
-    expect(order2[1].toHexString().toLowerCase()).to.be.equal(bnb.address.toLowerCase());
+    expect(order2[0]).to.be.equal(dai.address);
+    expect(order2[1]).to.be.equal(bnb.address);
     expect(order2[7].toString()).to.be.equal('0');
 	})
 });
