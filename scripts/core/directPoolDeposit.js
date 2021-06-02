@@ -14,7 +14,7 @@ async function main() {
   }
   const eth = {
     address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-    amount: "17.64"
+    amount: "13.5"
   }
   const bnb = {
     address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
