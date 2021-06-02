@@ -30,6 +30,10 @@ interface IVault {
     function cumulativeFundingRates(address _token) external view returns (uint256);
     function getNextFundingRate(address _token) external view returns (uint256);
 
+    function swapFeeBasisPoints() external view returns (uint256);
+    function stableSwapFeeBasisPoints() external view returns (uint256);
+
+    function stableTokens(address _token) external view returns (bool);
     function feeReserves(address _token) external view returns (uint256);
     function tokenDecimals(address _token) external view returns (uint256);
     function guaranteedUsd(address _token) external view returns (uint256);

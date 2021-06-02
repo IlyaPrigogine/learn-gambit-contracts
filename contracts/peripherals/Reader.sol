@@ -14,6 +14,30 @@ import "../amm/interfaces/IPancakeFactory.sol";
 contract Reader {
     using SafeMath for uint256;
 
+    uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+
+    function getMaxAmountIn(IVault _vault, address _tokenIn, address _tokenOut) public view returns (uint256) {
+        uint256 priceIn = _vault.getMinPrice(_tokenIn);
+        uint256 priceOut = _vault.getMaxPrice(_tokenOut);
+        uint256 poolAmount = _vault.poolAmounts(_tokenOut);
+        uint256 reservedAmount = _vault.reservedAmounts(_tokenOut);
+        uint256 availableAmount = poolAmount.sub(reservedAmount);
+
+        return availableAmount.mul(priceOut).div(priceIn);
+    }
+
+    function getAmountOut(IVault _vault, address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256, uint256) {
+        uint256 priceIn = _vault.getMinPrice(_tokenIn);
+        uint256 priceOut = _vault.getMaxPrice(_tokenOut);
+        uint256 amountOut = _amountIn.mul(priceIn).div(priceOut);
+        bool isStableSwap = _vault.stableTokens(_tokenIn) && _vault.stableTokens(_tokenOut);
+        uint256 feeBasisPoints = isStableSwap ? _vault.stableSwapFeeBasisPoints() : _vault.swapFeeBasisPoints();
+        uint256 amountOutAfterFees = amountOut.mul(BASIS_POINTS_DIVISOR.sub(feeBasisPoints)).div(BASIS_POINTS_DIVISOR);
+        uint256 feeAmount = amountOut.sub(amountOutAfterFees);
+
+        return (amountOutAfterFees, feeAmount);
+    }
+
     function getFees(address _vault, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](_tokens.length);
         for (uint256 i = 0; i < _tokens.length; i++) {

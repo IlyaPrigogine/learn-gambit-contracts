@@ -51,8 +51,8 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public maxLeverage = 50 * 10000; // 50x
 
     uint256 public liquidationFeeUsd;
-    uint256 public swapFeeBasisPoints = 30; // 0.3%
-    uint256 public stableSwapFeeBasisPoints = 4; // 0.04%
+    uint256 public override swapFeeBasisPoints = 30; // 0.3%
+    uint256 public override stableSwapFeeBasisPoints = 4; // 0.04%
     uint256 public marginFeeBasisPoints = 10; // 0.1%
 
     uint256 public fundingInterval = 8 hours;
@@ -69,7 +69,7 @@ contract Vault is ReentrancyGuard, IVault {
     mapping (address => uint256) public override tokenDecimals;
     mapping (address => uint256) public redemptionBasisPoints;
     mapping (address => uint256) public minProfitBasisPoints;
-    mapping (address => bool) public stableTokens;
+    mapping (address => bool) public override stableTokens;
     mapping (address => bool) public shortableTokens;
 
     // tokenBalances is used only to determine _transferIn values
