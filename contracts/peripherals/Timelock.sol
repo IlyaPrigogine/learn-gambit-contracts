@@ -74,6 +74,10 @@ contract Timelock {
         IVaultPriceFeed(_priceFeed).setMaxStrictPriceDeviation(_maxStrictPriceDeviation);
     }
 
+    function setSpreadBasisPoints(address _priceFeed, uint256 _spreadBasisPoints) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setSpreadBasisPoints(_spreadBasisPoints);
+    }
+
     function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {
         require(_priceSampleSpace <= 3, "Invalid _priceSampleSpace");
         IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);

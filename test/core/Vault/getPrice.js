@@ -106,8 +106,15 @@ describe("Vault.getPrice", function () {
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(0.9))
     expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq(expandDecimals(1, 30))
 
+    await vaultPriceFeed.setSpreadBasisPoints(20)
+    expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq(expandDecimals(1, 30))
+
+    await vaultPriceFeed.setSpreadBasisPoints(0)
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(0.89))
     expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq(expandDecimals(89, 28))
+
+    await vaultPriceFeed.setSpreadBasisPoints(20)
+    expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq("888220000000000000000000000000")
   })
 
   it("includes AMM price", async () => {
@@ -158,5 +165,9 @@ describe("Vault.getPrice", function () {
 
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(280))
     expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(300))
+
+    await vaultPriceFeed.setSpreadBasisPoints(20)
+    expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(199.6))
+    expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(300.6))
   })
 })

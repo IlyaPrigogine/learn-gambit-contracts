@@ -16,12 +16,15 @@ contract VaultPriceFeed is IVaultPriceFeed {
     uint256 public constant PRICE_PRECISION = 10 ** 30;
     uint256 public constant SECONDARY_PRICE_PRECISION = 10 ** 18;
     uint256 public constant ONE_USD = PRICE_PRECISION;
+    uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+    uint256 public constant MAX_SPREAD_BASIS_POINTS = 50;
 
     address public gov;
     bool public isAmmEnabled = true;
     bool public isSecondaryPriceEnabled = true;
     uint256 public priceSampleSpace = 3;
     uint256 public maxStrictPriceDeviation = 0;
+    uint256 public spreadBasisPoints = 0;
     address public secondaryPriceFeed;
 
     address public btc;
@@ -75,6 +78,11 @@ contract VaultPriceFeed is IVaultPriceFeed {
         bnbBusd = _bnbBusd;
         ethBnb = _ethBnb;
         btcBnb = _btcBnb;
+    }
+
+    function setSpreadBasisPoints(uint256 _spreadBasisPoints) external override onlyGov {
+        require(_spreadBasisPoints <= MAX_SPREAD_BASIS_POINTS, "VaultPriceFeed: invalid _spreadBasisPoints");
+        spreadBasisPoints = _spreadBasisPoints;
     }
 
     function setPriceSampleSpace(uint256 _priceSampleSpace) external override onlyGov {
@@ -170,7 +178,11 @@ contract VaultPriceFeed is IVaultPriceFeed {
             }
         }
 
-        return price;
+        if (_maximise) {
+            return price.mul(BASIS_POINTS_DIVISOR.add(spreadBasisPoints)).div(BASIS_POINTS_DIVISOR);
+        }
+
+        return price.mul(BASIS_POINTS_DIVISOR.sub(spreadBasisPoints)).div(BASIS_POINTS_DIVISOR);
     }
 
     function getSecondaryPrice(address _token) public view returns (uint256) {
