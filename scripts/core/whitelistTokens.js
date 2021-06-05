@@ -28,7 +28,7 @@ async function setVaultTokenConfig({
 async function main() {
   const vault = await contractAt("Vault", "0xc73A8DcAc88498FD4b4B1b2AaA37b0a2614Ff67B")
   const secondaryPriceFeed = { address: "0xDA7a001b254CD22e46d3eAB04d937489c93174C3" }
-  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0xf0313A44bE7e39Da035Ec581998314520aE42749")
+  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0x52F6D18B259B8e4864957F52Fd16eC97402d83B9")
   const redemptionBasisPoints = 10000
 
   const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
