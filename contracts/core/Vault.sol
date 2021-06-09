@@ -700,7 +700,7 @@ contract Vault is ReentrancyGuard, IVault {
         return _tokenAmount.mul(price).div(10 ** decimals);
     }
 
-    function tokenToUsdMin(address _token, uint256 _tokenAmount) public view returns (uint256) {
+    function tokenToUsdMin(address _token, uint256 _tokenAmount) public override view returns (uint256) {
         if (_tokenAmount == 0) { return 0; }
         uint256 price = getMinPrice(_token);
         uint256 decimals = tokenDecimals[_token];
