@@ -13,13 +13,13 @@ async function main() {
     {
       farm: usdg,
       yieldTrackerIndex: 0,
-      transferAmount: "45.0",
+      transferAmount: "80.0",
       shouldClaim: true
     },
     {
       farm: xgmt,
       yieldTrackerIndex: 0,
-      transferAmount: "45.0",
+      transferAmount: "80.0",
       shouldClaim: true
     }
   ]

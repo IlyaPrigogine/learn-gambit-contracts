@@ -10,33 +10,27 @@ async function main() {
 
   const btc = {
     symbol: "BTC",
-    address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
-    amount: "0.1603"
+    address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"
   }
   const eth = {
     symbol: "ETH",
-    address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-    amount: "4.4701"
+    address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8"
   }
   const bnb = {
     symbol: "BNB",
-    address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-    amount: "42.7548"
+    address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
   }
   const busd = {
     symbol: "BUSD",
-    address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
-    amount: "13709.5913"
+    address: "0xe9e7cea3dedca5984780bafc599bd69add087d56"
   }
   const usdc = {
     symbol: "USDC",
-    address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-    amount: "6134.1901"
+    address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"
   }
   const usdt = {
     symbol: "USDT",
-    address: "0x55d398326f99059fF775485246999027B3197955",
-    amount: "8134.1596"
+    address: "0x55d398326f99059fF775485246999027B3197955"
   }
 
   const tokens = [btc, eth, bnb, busd, usdc, usdt]

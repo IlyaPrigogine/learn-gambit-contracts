@@ -4,7 +4,7 @@ const { expandDecimals } = require("../../test/shared/utilities")
 async function main() {
   const receiver = { address: "0x9f169c2189A2d975C18965DE985936361b4a9De9" }
   const vault = await contractAt("Vault", "0xc73A8DcAc88498FD4b4B1b2AaA37b0a2614Ff67B")
-  const gov = await contractAt("Timelock", "0x330EeF6b9B1ea6EDd620C825c9919DC8b611d5d5")
+  const gov = await contractAt("Timelock", "0xEdbAA9A5522102b4A963cB7a771E5c072f471Deb")
   const balanceUpdater = await contractAt("BalanceUpdater", "0x912F4db2076079718D3b3A3Ab21F5Af22Bd1EDd3")
   const usdg = await contractAt("Token", "0x85E76cbf4893c1fbcB34dCF1239A91CE2A4CF5a7")
 

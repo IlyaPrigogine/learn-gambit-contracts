@@ -79,7 +79,7 @@ contract Timelock {
     }
 
     function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {
-        require(_priceSampleSpace <= 3, "Invalid _priceSampleSpace");
+        require(_priceSampleSpace <= 5, "Invalid _priceSampleSpace");
         IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);
     }
 
