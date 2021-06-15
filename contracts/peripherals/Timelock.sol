@@ -74,8 +74,12 @@ contract Timelock {
         IVaultPriceFeed(_priceFeed).setMaxStrictPriceDeviation(_maxStrictPriceDeviation);
     }
 
-    function setSpreadBasisPoints(address _priceFeed, uint256 _spreadBasisPoints) external onlyAdmin {
-        IVaultPriceFeed(_priceFeed).setSpreadBasisPoints(_spreadBasisPoints);
+    function setUseV2Pricing(address _priceFeed, bool _useV2Pricing) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setUseV2Pricing(_useV2Pricing);
+    }
+
+    function setSpreadBasisPoints(address _priceFeed, address _token, uint256 _spreadBasisPoints) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setSpreadBasisPoints(_token, _spreadBasisPoints);
     }
 
     function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {

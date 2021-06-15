@@ -106,14 +106,17 @@ describe("Vault.getPrice", function () {
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(0.9))
     expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq(expandDecimals(1, 30))
 
-    await vaultPriceFeed.setSpreadBasisPoints(20)
+    await vaultPriceFeed.setSpreadBasisPoints(usdc.address, 20)
     expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq(expandDecimals(1, 30))
 
-    await vaultPriceFeed.setSpreadBasisPoints(0)
+    await vaultPriceFeed.setSpreadBasisPoints(usdc.address, 0)
     await usdcPriceFeed.setLatestAnswer(toChainlinkPrice(0.89))
     expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq(expandDecimals(89, 28))
 
-    await vaultPriceFeed.setSpreadBasisPoints(20)
+    await vaultPriceFeed.setSpreadBasisPoints(usdc.address, 20)
+    expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq("888220000000000000000000000000")
+
+    await vaultPriceFeed.setUseV2Pricing(true)
     expect(await vaultPriceFeed.getPrice(usdc.address, false, true)).eq("888220000000000000000000000000")
   })
 
@@ -166,8 +169,26 @@ describe("Vault.getPrice", function () {
     await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(280))
     expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(300))
 
-    await vaultPriceFeed.setSpreadBasisPoints(20)
+    await vaultPriceFeed.setSpreadBasisPoints(bnb.address, 20)
     expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(199.6))
+    expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(300.6))
+
+    await vaultPriceFeed.setUseV2Pricing(true)
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(301))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(302))
+    await bnbPriceFeed.setLatestAnswer(toChainlinkPrice(303))
+
+    expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(299.4))
+    expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(303.606))
+
+    await vaultPriceFeed.setSpreadThresholdBasisPoints(90)
+
+    expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(299.4))
+    expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(303.606))
+
+    await vaultPriceFeed.setSpreadThresholdBasisPoints(100)
+
+    expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(299.4))
     expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(300.6))
   })
 })
