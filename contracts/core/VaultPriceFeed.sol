@@ -23,6 +23,7 @@ contract VaultPriceFeed is IVaultPriceFeed {
     bool public isAmmEnabled = true;
     bool public isSecondaryPriceEnabled = true;
     bool public useV2Pricing = false;
+    bool public favorPrimaryPrice = false;
     uint256 public priceSampleSpace = 3;
     uint256 public maxStrictPriceDeviation = 0;
     address public secondaryPriceFeed;
@@ -93,6 +94,10 @@ contract VaultPriceFeed is IVaultPriceFeed {
 
     function setSpreadThresholdBasisPoints(uint256 _spreadThresholdBasisPoints) external override onlyGov {
         spreadThresholdBasisPoints = _spreadThresholdBasisPoints;
+    }
+
+    function setFavorPrimaryPrice(bool _favorPrimaryPrice) external override onlyGov {
+        favorPrimaryPrice = _favorPrimaryPrice;
     }
 
     function setPriceSampleSpace(uint256 _priceSampleSpace) external override onlyGov {
@@ -208,6 +213,9 @@ contract VaultPriceFeed is IVaultPriceFeed {
 
         uint256 diff = ammPrice > _primaryPrice ? ammPrice.sub(_primaryPrice) : _primaryPrice.sub(ammPrice);
         if (diff.mul(BASIS_POINTS_DIVISOR) < _primaryPrice.mul(spreadThresholdBasisPoints)) {
+            if (favorPrimaryPrice) {
+                return _primaryPrice;
+            }
             return ammPrice;
         }
 

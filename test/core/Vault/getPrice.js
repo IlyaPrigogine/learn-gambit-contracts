@@ -190,5 +190,10 @@ describe("Vault.getPrice", function () {
 
     expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(299.4))
     expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(300.6))
+
+    await vaultPriceFeed.setFavorPrimaryPrice(true)
+
+    expect(await vaultPriceFeed.getPrice(bnb.address, false, true)).eq(toNormalizedPrice(300.398))
+    expect(await vaultPriceFeed.getPrice(bnb.address, true, true)).eq(toNormalizedPrice(303.606))
   })
 })

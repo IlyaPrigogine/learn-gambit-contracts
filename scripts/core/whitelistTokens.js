@@ -1,7 +1,7 @@
 const { deployContract, contractAt, sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 
-const shouldSetTokenConfig = false
+const shouldSetVaultTokenConfig = false
 
 async function setVaultTokenConfig({
   vault,
@@ -13,7 +13,7 @@ async function setVaultTokenConfig({
   isShortable,
   symbol
 }) {
-  if (!shouldSetTokenConfig) { return }
+  if (!shouldSetVaultTokenConfig) { return }
 
   await sendTxn(vault.setTokenConfig(
     token.address, // _token
@@ -27,8 +27,7 @@ async function setVaultTokenConfig({
 
 async function main() {
   const vault = await contractAt("Vault", "0xc73A8DcAc88498FD4b4B1b2AaA37b0a2614Ff67B")
-  const secondaryPriceFeed = { address: "0xDA7a001b254CD22e46d3eAB04d937489c93174C3" }
-  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0x52F6D18B259B8e4864957F52Fd16eC97402d83B9")
+  const vaultPriceFeed = await contractAt("VaultPriceFeed", "0x7Ae0f01A95DD8Ac3F6851228aBB01b2D94BD831c")
   const redemptionBasisPoints = 10000
 
   const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
@@ -44,8 +43,6 @@ async function main() {
   const busdPriceFeed = { address: "0xcBb98864Ef56E9042e7d2efef76141f15731B82f" }
   const usdcPriceFeed = { address: "0x51597f405303C4377E36123cBc172b13269EA163" }
   const usdtPriceFeed = { address: "0xB97Ad0E74fa7d920791E90258A6E2085088b4320" }
-
-  await sendTxn(vaultPriceFeed.setSecondaryPriceFeed(secondaryPriceFeed.address), "vaultPriceFeed.setSecondaryPriceFeed")
 
   await sendTxn(vaultPriceFeed.setTokenConfig(
     btc.address, // _token
