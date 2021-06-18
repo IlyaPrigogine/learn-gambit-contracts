@@ -67,10 +67,10 @@ contract Vault is ReentrancyGuard, IVault {
 
     mapping (address => bool) public whitelistedTokens;
     mapping (address => uint256) public override tokenDecimals;
-    mapping (address => uint256) public redemptionBasisPoints;
+    mapping (address => uint256) public override redemptionBasisPoints;
     mapping (address => uint256) public minProfitBasisPoints;
     mapping (address => bool) public override stableTokens;
-    mapping (address => bool) public shortableTokens;
+    mapping (address => bool) public override shortableTokens;
 
     // tokenBalances is used only to determine _transferIn values
     mapping (address => uint256) public tokenBalances;
@@ -278,7 +278,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _minProfitBps,
         bool _isStable,
         bool _isShortable
-    ) external {
+    ) external override {
         _onlyGov();
         // increment token count for the first time
         if (!whitelistedTokens[_token]) {

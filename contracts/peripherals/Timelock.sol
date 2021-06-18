@@ -58,6 +58,29 @@ contract Timelock {
         );
     }
 
+    function setTokenConfig(
+        address _vault,
+        address _token,
+        uint256 _minProfitBps
+    ) external onlyAdmin {
+        require(_minProfitBps <= 500, "Timelock: invalid _minProfitBps");
+
+        IVault vault = IVault(_vault);
+        uint256 tokenDecimals = vault.tokenDecimals(_token);
+        uint256 redemptionBps = vault.redemptionBasisPoints(_token);
+        bool isStable = vault.stableTokens(_token);
+        bool isShortable = vault.shortableTokens(_token);
+
+        IVault(_vault).setTokenConfig(
+            _token,
+            tokenDecimals,
+            redemptionBps,
+            _minProfitBps,
+            isStable,
+            isShortable
+        );
+    }
+
     function removeAdmin(address _token, address _account) external onlyAdmin {
         IYieldToken(_token).removeAdmin(_account);
     }
