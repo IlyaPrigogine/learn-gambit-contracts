@@ -182,7 +182,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event UpdateSwapOrder(
         address account,
-        uint256 orderIndex,
+        uint256 ordexIndex,
         address[] path,
         uint256 amountIn,
         uint256 minOut,
@@ -246,14 +246,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         gov = _gov;
     }
 
-    function getSwapOrder(address _account, uint256 _orderIndex) public view returns (
-        address, 
-        address,
-        address,
-        uint256,
-        uint256,
-        uint256,
-        bool
+    function getSwapOrder(address _account, uint256 _orderIndex) override public view returns (
+        address path0, 
+        address path1,
+        address path2,
+        uint256 amountIn,
+        uint256 minOut,
+        uint256 triggerRatio,
+        bool triggerAboveThreshold
     ) {
         SwapOrder memory order = swapOrders[_account][_orderIndex];
         return (
@@ -482,6 +482,50 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             require(isPriceValid, "OrderBook: invalid price for execution");
         }
         return (currentPrice, isPriceValid);
+    }
+
+    function getDecreaseOrder(address _account, uint256 _orderIndex) public view returns (
+        address collateralToken,
+        uint256 collateralDelta,
+        address indexToken,
+        uint256 sizeDelta,
+        bool isLong,
+        uint256 triggerPrice,
+        bool triggerAboveThreshold
+    ) {
+        DecreaseOrder memory order = decreaseOrders[_account][_orderIndex];
+        return (
+            order.collateralToken,
+            order.collateralDelta,
+            order.indexToken,
+            order.sizeDelta,
+            order.isLong,
+            order.triggerPrice,
+            order.triggerAboveThreshold
+        );
+    }
+
+    function getIncreaseOrder(address _account, uint256 _orderIndex) public view returns (
+        address purchaseToken, 
+        uint256 purchaseTokenAmount,
+        address collateralToken,
+        address indexToken,
+        uint256 sizeDelta,
+        bool isLong,
+        uint256 triggerPrice,
+        bool triggerAboveThreshold
+    ) {
+        IncreaseOrder memory order = increaseOrders[_account][_orderIndex];
+        return (
+            order.purchaseToken,
+            order.purchaseTokenAmount,
+            order.collateralToken,
+            order.indexToken,
+            order.sizeDelta,
+            order.isLong,
+            order.triggerPrice,
+            order.triggerAboveThreshold
+        );
     }
 
     function createIncreaseOrder(

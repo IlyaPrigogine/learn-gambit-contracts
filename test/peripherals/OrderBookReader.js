@@ -2,6 +2,7 @@ const { expect, use } = require("chai")
 const { solidity } = require("ethereum-waffle")
 const { deployContract } = require("../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../shared/utilities")
+const { initVault } = require("../core/Vault/helpers")
 const { toChainlinkPrice } = require("../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../shared/units")
 
@@ -19,15 +20,24 @@ describe("OrderBookReader", function () {
   let vault;
   let usdg;
   let router;
+  let vaultPriceFeed;
 
   beforeEach(async () => {
     dai = await deployContract("Token", [])
+
     btc = await deployContract("Token", [])
+    btcPriceFeed = await deployContract("PriceFeed", [])
+    await btcPriceFeed.setLatestAnswer(toChainlinkPrice(50000))
 
     bnb = await deployContract("Token", [])
+
     vault = await deployContract("Vault", [])
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
+    vaultPriceFeed = await deployContract("VaultPriceFeed", [])
+
+    await initVault(vault, router, usdg, vaultPriceFeed);
+    await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
 
     orderBook = await deployContract("OrderBook", [])
     await router.addPlugin(orderBook.address);
@@ -44,6 +54,9 @@ describe("OrderBookReader", function () {
 
     await dai.mint(user0.address, expandDecimals(10000000, 18))
     await dai.connect(user0).approve(router.address, expandDecimals(1000000, 18))
+
+    await btc.mint(user0.address, expandDecimals(100, 8))
+    await btc.connect(user0).approve(router.address, expandDecimals(100, 8))
   })
 
   function createSwapOrder(toToken = bnb.address) {
@@ -61,9 +74,26 @@ describe("OrderBookReader", function () {
     );
   }
 
-  function unflattenSwapOrders([uintProps, addressProps]) {
-    const uintLength = 5;
-    const addressLength = 3;
+  function createIncreaseOrder(sizeDelta) {
+    const executionFee = 500000;
+
+    return orderBook.connect(user0).createIncreaseOrder(
+      [btc.address],
+      expandDecimals(1, 8),
+      btc.address,
+      0,
+      sizeDelta,
+      btc.address, // collateralToken
+      true, // isLong
+      toUsd(53000), // triggerPrice
+      false, // triggerAboveThreshold
+      executionFee,
+      false, // shouldWrap
+      { value: executionFee }
+    );
+  }
+
+  function unflattenOrders([uintProps, addressProps], uintLength, addressLength) {
     const count = uintProps.length / uintLength;
 
     const ret = [];
@@ -78,18 +108,31 @@ describe("OrderBookReader", function () {
     return ret;
   }
 
+  it("getIncreaseOrders", async () => {
+    await createIncreaseOrder(toUsd(100000));
+    await createIncreaseOrder(toUsd(200000));
+
+    const [order1, order2] = unflattenOrders(await reader.getIncreaseOrders(orderBook.address, user0.address, [0, 1]), 5, 3);
+
+    expect(order1[2]).to.be.equal(btc.address)
+    expect(order1[4]).to.be.equal(toUsd(100000))
+
+    expect(order2[2]).to.be.equal(btc.address)
+    expect(order2[4]).to.be.equal(toUsd(200000))
+  });
+
 	it("getSwapOrders", async () => {
     await createSwapOrder(bnb.address);
     await createSwapOrder(btc.address);
 
-    const [order1, order2] = unflattenSwapOrders(await reader.getSwapOrders(orderBook.address, user0.address, 0, 2));
+    const [order1, order2] = unflattenOrders(await reader.getSwapOrders(orderBook.address, user0.address, [0, 1]), 5, 3);
 
     expect(order1[0]).to.be.equal(dai.address);
-    expect(order1[1]).to.be.equal(btc.address);
-    expect(order1[7].toString()).to.be.equal('1');
+    expect(order1[1]).to.be.equal(bnb.address);
+    expect(order1[7].toString()).to.be.equal('0');
 
     expect(order2[0]).to.be.equal(dai.address);
-    expect(order2[1]).to.be.equal(bnb.address);
-    expect(order2[7].toString()).to.be.equal('0');
+    expect(order2[1]).to.be.equal(btc.address);
+    expect(order2[7].toString()).to.be.equal('1');
 	})
 });

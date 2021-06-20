@@ -39,7 +39,7 @@ async function main() {
 
   await sendTxn(vault.setTokenConfig(
     btc.address, // _token
-    18, // _tokenDecimals
+    8, // _tokenDecimals
     redemptionBasisPoints, // _redemptionBps
     0, // _minProfitBps
     false, // _isStable
