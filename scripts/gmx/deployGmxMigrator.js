@@ -5,13 +5,7 @@ async function main() {
   const { MaxUint256 } = ethers.constants
   const precision = 1000000
 
-  const signers = [
-    "0x9f169c2189A2d975C18965DE985936361b4a9De9",
-    "0x5F799f365Fa8A2B60ac0429C48B153cA5a6f0Cf8",
-    "0x3BD57005933A56498496B6948e083CeC6315753c"
-  ]
-
-  const gmxMigrator = await deployContract("GmxMigrator", [2, signers])
+  const gmxMigrator = await deployContract("GmxMigrator", [2])
   const gmtGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "GMT GMX (IOU)", "GMT:GMX"])
   const xgmtGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "xGMT GMX (IOU)", "xGMT:GMX"])
   const gmtUsdgGmxIou = await deployContract("GmxIou", [gmxMigrator.address, "GMT-USDG GMX (IOU)", "GMT-USDG:GMX"])
@@ -25,6 +19,12 @@ async function main() {
 
   const ammRouter = { address: "0x10ED43C718714eb63d5aA57B78B54704E256024E" }
   const gmxPrice = bigNumberify(2 * precision)
+
+  const signers = [
+    "0x9f169c2189A2d975C18965DE985936361b4a9De9",
+    "0x5F799f365Fa8A2B60ac0429C48B153cA5a6f0Cf8",
+    "0x3BD57005933A56498496B6948e083CeC6315753c"
+  ]
 
   const gmtPrice = bigNumberify(10.97 * precision)
   const xgmtPrice = bigNumberify(90.31 * precision)
@@ -42,6 +42,7 @@ async function main() {
   await gmxMigrator.initialize(
     ammRouter.address,
     gmxPrice,
+    signers,
     whitelistedTokens,
     iouTokens,
     prices,

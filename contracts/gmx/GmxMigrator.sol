@@ -45,14 +45,9 @@ contract GmxMigrator is ReentrancyGuard {
     event SignAction(bytes32 action, uint256 nonce);
     event ClearAction(bytes32 action, uint256 nonce);
 
-    constructor(uint256 _minAuthorizations, address[] memory _signers) public {
+    constructor(uint256 _minAuthorizations) public {
         admin = msg.sender;
         minAuthorizations = _minAuthorizations;
-        signers = _signers;
-        for (uint256 i = 0; i < _signers.length; i++) {
-            address signer = _signers[i];
-            isSigner[signer] = true;
-        }
     }
 
     modifier onlyAdmin() {
@@ -68,6 +63,7 @@ contract GmxMigrator is ReentrancyGuard {
     function initialize(
         address _ammRouter,
         uint256 _gmxPrice,
+        address[] memory _signers,
         address[] memory _whitelistedTokens,
         address[] memory _iouTokens,
         uint256[] memory _prices,
@@ -87,6 +83,12 @@ contract GmxMigrator is ReentrancyGuard {
 
         ammRouter = _ammRouter;
         gmxPrice = _gmxPrice;
+
+        signers = _signers;
+        for (uint256 i = 0; i < _signers.length; i++) {
+            address signer = _signers[i];
+            isSigner[signer] = true;
+        }
 
         for (uint256 i = 0; i < _whitelistedTokens.length; i++) {
             address token = _whitelistedTokens[i];
