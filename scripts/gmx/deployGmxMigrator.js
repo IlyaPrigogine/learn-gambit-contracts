@@ -21,9 +21,9 @@ async function main() {
   const gmxPrice = bigNumberify(2 * precision)
 
   const signers = [
-    "0x9f169c2189A2d975C18965DE985936361b4a9De9",
-    "0x5F799f365Fa8A2B60ac0429C48B153cA5a6f0Cf8",
-    "0x3BD57005933A56498496B6948e083CeC6315753c"
+    "0x3D850Acfaa18c58b383fCA69d4d867Dc5Bb697c5", // Ben Simon
+    "0x881690382102106b00a99E3dB86056D0fC71eee6", // Han Wen
+    "0x2e5d207a4c0f7e7c52f6622dcc6eb44bc0fe1a13" // Krunal Amin
   ]
 
   const gmtPrice = bigNumberify(10.97 * precision)
