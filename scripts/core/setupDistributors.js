@@ -4,8 +4,6 @@ const { expandDecimals } = require("../../test/shared/utilities")
 async function main() {
   const usdg = await contractAt("YieldToken", "0x85E76cbf4893c1fbcB34dCF1239A91CE2A4CF5a7")
   const xgmt = await contractAt("YieldToken", "0xe304ff0983922787Fd84BC9170CD21bF78B16B10")
-  const gmtUsdgFarm = await contractAt("YieldFarm", "0x3E8B08876c791dC880ADC8f965A02e53Bb9C0422")
-  const xgmtUsdgFarm = await contractAt("YieldFarm", "0x68D7ee2A16AB7c0Ee1D670BECd144166d2Ae0759")
   const tokenDecimals = 18
   const wbnb = await contractAt("YieldToken", "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c")
 
@@ -13,13 +11,13 @@ async function main() {
     {
       farm: usdg,
       yieldTrackerIndex: 0,
-      transferAmount: "30.0",
+      transferAmount: "42.0",
       shouldClaim: true
     },
     {
       farm: xgmt,
       yieldTrackerIndex: 0,
-      transferAmount: "30.0",
+      transferAmount: "0.0",
       shouldClaim: true
     }
   ]
