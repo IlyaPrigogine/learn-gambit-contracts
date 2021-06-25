@@ -41,19 +41,19 @@ async function main() {
     const minPrice2 = await vaultPriceFeed2.getPrice(token.address, false, true)
     const diff1 = maxPrice1.sub(minPrice1)
     const diff2 = maxPrice2.sub(minPrice2)
-    const spread1 = diff1.mul(10000).div(minPrice1)
-    const spread2 = diff2.mul(10000).div(minPrice2)
+    const spread1 = diff1.mul(1000000).div(minPrice1)
+    const spread2 = diff2.mul(1000000).div(minPrice2)
     console.log(`------------ ${token.symbol} ------------`)
     console.log("\n1.")
     console.log(`max1: ${ethers.utils.formatUnits(maxPrice1, usdDecimals)}`)
     console.log(`min1: ${ethers.utils.formatUnits(minPrice1, usdDecimals)}`)
     console.log(`diff1: ${ethers.utils.formatUnits(diff1, usdDecimals)}`)
-    console.log(`spread1: ${ethers.utils.formatUnits(spread1, 2)}`)
+    console.log(`spread1: ${ethers.utils.formatUnits(spread1, 4)}`)
     console.log("\n2.")
     console.log(`max2: ${ethers.utils.formatUnits(maxPrice2, usdDecimals)}`)
     console.log(`min2: ${ethers.utils.formatUnits(minPrice2, usdDecimals)}`)
     console.log(`diff2: ${ethers.utils.formatUnits(diff2, usdDecimals)}`)
-    console.log(`spread2: ${ethers.utils.formatUnits(spread2, 2)}`)
+    console.log(`spread2: ${ethers.utils.formatUnits(spread2, 4)}`)
   }
 }
 
