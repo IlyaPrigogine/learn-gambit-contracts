@@ -4,6 +4,7 @@ const { deployContract } = require("../shared/fixtures")
 const { expandDecimals, getBlockTime, increaseTime, mineBlock, reportGasUsed } = require("../shared/utilities")
 const { toChainlinkPrice } = require("../shared/chainlink")
 const { toUsd, toNormalizedPrice } = require("../shared/units")
+const { initVault, getBnbConfig, getBtcConfig, getDaiConfig } = require("../core/Vault/helpers")
 
 use(solidity)
 
@@ -36,8 +37,9 @@ describe("Reader", function () {
     vault = await deployContract("Vault", [])
     usdg = await deployContract("USDG", [vault.address])
     router = await deployContract("Router", [vault.address, usdg.address, bnb.address])
+    vaultPriceFeed = await deployContract("VaultPriceFeed", [])
 
-    await vault.initialize(router.address, usdg.address, expandDecimals(200 * 1000, 18), toUsd(5), 600)
+    await initVault(vault, router, usdg, vaultPriceFeed)
 
     distributor0 = await deployContract("TimeDistributor", [])
     yieldTracker0 = await deployContract("YieldTracker", [usdg.address])
@@ -49,32 +51,19 @@ describe("Reader", function () {
     await usdg.setYieldTrackers([yieldTracker0.address])
 
     reader = await deployContract("Reader", [])
+
+    await vaultPriceFeed.setTokenConfig(btc.address, btcPriceFeed.address, 8, false)
+    await vaultPriceFeed.setTokenConfig(dai.address, daiPriceFeed.address, 8, false)
   })
 
   it("getVaultTokenInfo", async () => {
     await daiPriceFeed.setLatestAnswer(toChainlinkPrice(1))
-    await vault.setTokenConfig(
-      dai.address, // _token
-      daiPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      18, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      true // _isStable
-    )
+    await vault.setTokenConfig(...getDaiConfig(dai, daiPriceFeed))
 
     await btcPriceFeed.setLatestAnswer(toChainlinkPrice(60000))
-    await vault.setTokenConfig(
-      btc.address, // _token
-      btcPriceFeed.address, // _priceFeed
-      8, // _priceDecimals
-      8, // _tokenDecimals
-      9000, // _redemptionBps
-      75, // _minProfitBps
-      false // _isStable
-    )
+    await vault.setTokenConfig(...getBtcConfig(btc, btcPriceFeed))
 
     const results = await reader.getVaultTokenInfo(vault.address, bnb.address, expandDecimals(1, 30), [btc.address, dai.address])
-    expect(await results.length).eq(12)
+    expect(await results.length).eq(18)
   })
 })

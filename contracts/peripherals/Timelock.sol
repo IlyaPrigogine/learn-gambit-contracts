@@ -14,6 +14,8 @@ import "../libraries/token/IERC20.sol";
 contract Timelock {
     using SafeMath for uint256;
 
+    uint256 public constant PRICE_PRECISION = 10 ** 30;
+
     uint256 public buffer;
     address public admin;
 
@@ -36,6 +38,49 @@ contract Timelock {
         admin = msg.sender;
     }
 
+    function setFees(
+        address _vault,
+        uint256 _swapFeeBasisPoints,
+        uint256 _stableSwapFeeBasisPoints,
+        uint256 _marginFeeBasisPoints,
+        uint256 _liquidationFeeUsd
+    ) external onlyAdmin {
+        require(_swapFeeBasisPoints < 100, "Timelock: invalid _swapFeeBasisPoints");
+        require(_stableSwapFeeBasisPoints < 100, "Timelock: invalid _stableSwapFeeBasisPoints");
+        require(_marginFeeBasisPoints < 100, "Timelock: invalid _marginFeeBasisPoints");
+        require(_liquidationFeeUsd < 10 * PRICE_PRECISION, "Timelock: invalid _liquidationFeeUsd");
+
+        IVault(_vault).setFees(
+            _swapFeeBasisPoints,
+            _stableSwapFeeBasisPoints,
+            _marginFeeBasisPoints,
+            _liquidationFeeUsd
+        );
+    }
+
+    function setTokenConfig(
+        address _vault,
+        address _token,
+        uint256 _minProfitBps
+    ) external onlyAdmin {
+        require(_minProfitBps <= 500, "Timelock: invalid _minProfitBps");
+
+        IVault vault = IVault(_vault);
+        uint256 tokenDecimals = vault.tokenDecimals(_token);
+        uint256 redemptionBps = vault.redemptionBasisPoints(_token);
+        bool isStable = vault.stableTokens(_token);
+        bool isShortable = vault.shortableTokens(_token);
+
+        IVault(_vault).setTokenConfig(
+            _token,
+            tokenDecimals,
+            redemptionBps,
+            _minProfitBps,
+            isStable,
+            isShortable
+        );
+    }
+
     function removeAdmin(address _token, address _account) external onlyAdmin {
         IYieldToken(_token).removeAdmin(_account);
     }
@@ -44,12 +89,32 @@ contract Timelock {
         IVaultPriceFeed(_priceFeed).setIsAmmEnabled(_isEnabled);
     }
 
+    function setIsSecondaryPriceEnabled(address _priceFeed, bool _isEnabled) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setIsSecondaryPriceEnabled(_isEnabled);
+    }
+
     function setMaxStrictPriceDeviation(address _priceFeed, uint256 _maxStrictPriceDeviation) external onlyAdmin {
         IVaultPriceFeed(_priceFeed).setMaxStrictPriceDeviation(_maxStrictPriceDeviation);
     }
 
+    function setUseV2Pricing(address _priceFeed, bool _useV2Pricing) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setUseV2Pricing(_useV2Pricing);
+    }
+
+    function setSpreadBasisPoints(address _priceFeed, address _token, uint256 _spreadBasisPoints) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setSpreadBasisPoints(_token, _spreadBasisPoints);
+    }
+
+    function setSpreadThresholdBasisPoints(address _priceFeed, uint256 _spreadThresholdBasisPoints) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setSpreadThresholdBasisPoints(_spreadThresholdBasisPoints);
+    }
+
+    function setFavorPrimaryPrice(address _priceFeed, bool _favorPrimaryPrice) external onlyAdmin {
+        IVaultPriceFeed(_priceFeed).setFavorPrimaryPrice(_favorPrimaryPrice);
+    }
+
     function setPriceSampleSpace(address _priceFeed,uint256 _priceSampleSpace) external onlyAdmin {
-        require(_priceSampleSpace <= 3, "Invalid _priceSampleSpace");
+        require(_priceSampleSpace <= 5, "Invalid _priceSampleSpace");
         IVaultPriceFeed(_priceFeed).setPriceSampleSpace(_priceSampleSpace);
     }
 

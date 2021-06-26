@@ -6,7 +6,23 @@ interface IVault {
     function setIsMintingEnabled(bool _isMintingEnabled) external;
     function setIsSwapEnabled(bool _isSwapEnabled) external;
 
-    function setPriceFeed(address _ammPriceFeed) external;
+    function setFees(
+        uint256 _swapFeeBasisPoints,
+        uint256 _stableSwapFeeBasisPoints,
+        uint256 _marginFeeBasisPoints,
+        uint256 _liquidationFeeUsd
+    ) external;
+
+    function setTokenConfig(
+        address _token,
+        uint256 _tokenDecimals,
+        uint256 _redemptionBps,
+        uint256 _minProfitBps,
+        bool _isStable,
+        bool _isShortable
+    ) external;
+
+    function setPriceFeed(address _priceFeed) external;
     function setMaxUsdg(uint256 _maxUsdgBatchSize, uint256 _maxUsdgBuffer) external;
     function setMaxGasPrice(uint256 _maxGasPrice) external;
     function withdrawFees(address _token, address _receiver) external returns (uint256);
@@ -24,8 +40,14 @@ interface IVault {
     function cumulativeFundingRates(address _token) external view returns (uint256);
     function getNextFundingRate(address _token) external view returns (uint256);
 
+    function swapFeeBasisPoints() external view returns (uint256);
+    function stableSwapFeeBasisPoints() external view returns (uint256);
+
+    function stableTokens(address _token) external view returns (bool);
+    function shortableTokens(address _token) external view returns (bool);
     function feeReserves(address _token) external view returns (uint256);
     function tokenDecimals(address _token) external view returns (uint256);
+    function redemptionBasisPoints(address _token) external view returns (uint256);
     function guaranteedUsd(address _token) external view returns (uint256);
     function poolAmounts(address _token) external view returns (uint256);
     function reservedAmounts(address _token) external view returns (uint256);

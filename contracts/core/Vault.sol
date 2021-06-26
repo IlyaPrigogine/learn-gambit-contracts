@@ -51,8 +51,8 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public maxLeverage = 50 * 10000; // 50x
 
     uint256 public liquidationFeeUsd;
-    uint256 public swapFeeBasisPoints = 30; // 0.3%
-    uint256 public stableSwapFeeBasisPoints = 4; // 0.04%
+    uint256 public override swapFeeBasisPoints = 30; // 0.3%
+    uint256 public override stableSwapFeeBasisPoints = 4; // 0.04%
     uint256 public marginFeeBasisPoints = 10; // 0.1%
 
     uint256 public fundingInterval = 8 hours;
@@ -67,10 +67,10 @@ contract Vault is ReentrancyGuard, IVault {
 
     mapping (address => bool) public whitelistedTokens;
     mapping (address => uint256) public override tokenDecimals;
-    mapping (address => uint256) public redemptionBasisPoints;
+    mapping (address => uint256) public override redemptionBasisPoints;
     mapping (address => uint256) public minProfitBasisPoints;
-    mapping (address => bool) public stableTokens;
-    mapping (address => bool) public shortableTokens;
+    mapping (address => bool) public override stableTokens;
+    mapping (address => bool) public override shortableTokens;
 
     // tokenBalances is used only to determine _transferIn values
     mapping (address => uint256) public tokenBalances;
@@ -251,7 +251,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _stableSwapFeeBasisPoints,
         uint256 _marginFeeBasisPoints,
         uint256 _liquidationFeeUsd
-    ) external {
+    ) external override {
         _onlyGov();
         require(_swapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _swapFeeBasisPoints");
         require(_stableSwapFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Vault: invalid _stableSwapFeeBasisPoints");
@@ -278,7 +278,7 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 _minProfitBps,
         bool _isStable,
         bool _isShortable
-    ) external {
+    ) external override {
         _onlyGov();
         // increment token count for the first time
         if (!whitelistedTokens[_token]) {

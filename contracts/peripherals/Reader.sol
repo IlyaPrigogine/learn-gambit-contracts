@@ -14,6 +14,30 @@ import "../amm/interfaces/IPancakeFactory.sol";
 contract Reader {
     using SafeMath for uint256;
 
+    uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+
+    function getMaxAmountIn(IVault _vault, address _tokenIn, address _tokenOut) public view returns (uint256) {
+        uint256 priceIn = _vault.getMinPrice(_tokenIn);
+        uint256 priceOut = _vault.getMaxPrice(_tokenOut);
+        uint256 poolAmount = _vault.poolAmounts(_tokenOut);
+        uint256 reservedAmount = _vault.reservedAmounts(_tokenOut);
+        uint256 availableAmount = poolAmount.sub(reservedAmount);
+
+        return availableAmount.mul(priceOut).div(priceIn);
+    }
+
+    function getAmountOut(IVault _vault, address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256, uint256) {
+        uint256 priceIn = _vault.getMinPrice(_tokenIn);
+        uint256 priceOut = _vault.getMaxPrice(_tokenOut);
+        uint256 amountOut = _amountIn.mul(priceIn).div(priceOut);
+        bool isStableSwap = _vault.stableTokens(_tokenIn) && _vault.stableTokens(_tokenOut);
+        uint256 feeBasisPoints = isStableSwap ? _vault.stableSwapFeeBasisPoints() : _vault.swapFeeBasisPoints();
+        uint256 amountOutAfterFees = amountOut.mul(BASIS_POINTS_DIVISOR.sub(feeBasisPoints)).div(BASIS_POINTS_DIVISOR);
+        uint256 feeAmount = amountOut.sub(amountOutAfterFees);
+
+        return (amountOutAfterFees, feeAmount);
+    }
+
     function getFees(address _vault, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory amounts = new uint256[](_tokens.length);
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -85,6 +109,16 @@ contract Reader {
         return fundingRates;
     }
 
+    function getTokenSupply(IERC20 _token, address[] memory _excludedAccounts) public view returns (uint256) {
+        uint256 supply = _token.totalSupply();
+        for (uint256 i = 0; i < _excludedAccounts.length; i++) {
+            address account = _excludedAccounts[i];
+            uint256 balance = _token.balanceOf(account);
+            supply = supply.sub(balance);
+        }
+        return supply;
+    }
+
     function getTokenBalances(address _account, address[] memory _tokens) public view returns (uint256[] memory) {
         uint256[] memory balances = new uint256[](_tokens.length);
         for (uint256 i = 0; i < _tokens.length; i++) {
@@ -133,8 +167,8 @@ contract Reader {
             amounts[i * propsLength + 4] = vault.getMinPrice(token);
             amounts[i * propsLength + 5] = vault.getMaxPrice(token);
             amounts[i * propsLength + 6] = vault.guaranteedUsd(token);
-            amounts[i * propsLength + 7] = priceFeed.getPrice(token, false, true);
-            amounts[i * propsLength + 8] = priceFeed.getPrice(token, true, true);
+            amounts[i * propsLength + 7] = priceFeed.getPrice(token, false, false);
+            amounts[i * propsLength + 8] = priceFeed.getPrice(token, true, false);
         }
 
         return amounts;

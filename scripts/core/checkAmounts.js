@@ -9,28 +9,28 @@ async function main() {
   const tokenDecimals = 18
 
   const btc = {
-    address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
-    amount: "0.1603"
+    symbol: "BTC",
+    address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c"
   }
   const eth = {
-    address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-    amount: "4.4701"
+    symbol: "ETH",
+    address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8"
   }
   const bnb = {
-    address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-    amount: "42.7548"
+    symbol: "BNB",
+    address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
   }
   const busd = {
-    address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
-    amount: "13709.5913"
+    symbol: "BUSD",
+    address: "0xe9e7cea3dedca5984780bafc599bd69add087d56"
   }
   const usdc = {
-    address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-    amount: "6134.1901"
+    symbol: "USDC",
+    address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"
   }
   const usdt = {
-    address: "0x55d398326f99059fF775485246999027B3197955",
-    amount: "8134.1596"
+    symbol: "USDT",
+    address: "0x55d398326f99059fF775485246999027B3197955"
   }
 
   const tokens = [btc, eth, bnb, busd, usdc, usdt]
@@ -42,9 +42,11 @@ async function main() {
     const balance = await token.balanceOf(vault.address)
     const vaultAmount = poolAmount.add(feeReserve)
     if (vaultAmount.gt(balance)) {
-      console.log(`${token.address}: vaultAmount.gt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${vaultAmount.sub(balance).toString()}`)
+      const diff = vaultAmount.sub(balance)
+      console.log(`${token.address}: vaultAmount.gt(balance): ${ethers.utils.formatUnits(diff, 18)} ${tokens[i].symbol}`)
     } else {
-      console.log(`${token.address}: vaultAmount.lt(balance): ${vaultAmount.toString()}, ${balance.toString()}, ${balance.sub(vaultAmount).toString()}`)
+      const diff = balance.sub(vaultAmount)
+      console.log(`${token.address}: vaultAmount.lt(balance): ${ethers.utils.formatUnits(diff, 18)} ${tokens[i].symbol}`)
     }
   }
 }
