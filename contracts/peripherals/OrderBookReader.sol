@@ -5,10 +5,6 @@ pragma solidity 0.6.12;
 import "../libraries/math/SafeMath.sol";
 
 import "../core/interfaces/IOrderBook.sol";
-import "../core/OrderBook.sol";
-
-// TODO remove
-import "hardhat/console.sol";
 
 contract OrderBookReader {
     using SafeMath for uint256;
@@ -31,8 +27,7 @@ contract OrderBookReader {
         uint256[] memory uintProps = new uint256[](vars.uintLength * _indices.length);
         address[] memory addressProps = new address[](vars.addressLength * _indices.length);
 
-        // TODO use IOrderBook
-        OrderBook orderBook = OrderBook(_orderBookAddress);
+        IOrderBook orderBook = IOrderBook(_orderBookAddress);
 
         while (vars.i < _indices.length) {
             vars.index = _indices[vars.i];
@@ -73,8 +68,7 @@ contract OrderBookReader {
         uint256[] memory uintProps = new uint256[](vars.uintLength * _indices.length);
         address[] memory addressProps = new address[](vars.addressLength * _indices.length);
 
-        // TODO use IOrderBook
-        OrderBook orderBook = OrderBook(_orderBookAddress);
+        IOrderBook orderBook = IOrderBook(_orderBookAddress);
 
         while (vars.i < _indices.length) {
             vars.index = _indices[vars.i];

@@ -484,7 +484,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         return (currentPrice, isPriceValid);
     }
 
-    function getDecreaseOrder(address _account, uint256 _orderIndex) public view returns (
+    function getDecreaseOrder(address _account, uint256 _orderIndex) override public view returns (
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -505,7 +505,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         );
     }
 
-    function getIncreaseOrder(address _account, uint256 _orderIndex) public view returns (
+    function getIncreaseOrder(address _account, uint256 _orderIndex) override public view returns (
         address purchaseToken, 
         uint256 purchaseTokenAmount,
         address collateralToken,
