@@ -368,8 +368,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
     function validateSwapOrderPriceWithTriggerAboveThreshold(
         address[] memory _path,
-        uint256 _triggerRatio,
-        bool _raise
+        uint256 _triggerRatio
     ) public view returns (bool) {
         // limit orders don't need this validation because minOut is enough
         // so this validation handles scenarios for stop orders only
@@ -400,9 +399,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
 
         bool isValid = currentRatio > _triggerRatio;
-        if (_raise) {
-            require(isValid, "OrderBook: invalid price for execution");
-        }
         return isValid;
     }
 
@@ -433,10 +429,9 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         if (order.triggerAboveThreshold) {
             // gas optimisation
             // order.minAmount should prevent wrong price execution in case of simple limit order
-            validateSwapOrderPriceWithTriggerAboveThreshold(
-                order.path,
-                order.triggerRatio,
-                true
+            require(
+                validateSwapOrderPriceWithTriggerAboveThreshold(order.path, order.triggerRatio),
+                "OrderBook: invalid price for execution"
             );
         }
 
