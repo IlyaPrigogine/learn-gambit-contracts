@@ -73,7 +73,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
     event CreateIncreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         address purchaseToken,
         uint256 purchaseTokenAmount,
         address indexToken,
@@ -85,7 +85,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event CancelIncreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         address purchaseToken,
         uint256 purchaseTokenAmount,
         address indexToken,
@@ -97,7 +97,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event ExecuteIncreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         address purchaseToken,
         uint256 purchaseTokenAmount,
         address indexToken,
@@ -110,14 +110,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event UpdateIncreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         uint256 sizeDelta,
         uint256 triggerPrice,
         bool triggerAboveThreshold
     );
     event CreateDecreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -129,7 +129,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event CancelDecreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -141,7 +141,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event ExecuteDecreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -154,7 +154,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event UpdateDecreaseOrder(
         address indexed account,
-        uint256 indexed orderIndex,
+        uint256 orderIndex,
         uint256 collateralDelta,
         uint256 sizeDelta,
         uint256 triggerPrice,
