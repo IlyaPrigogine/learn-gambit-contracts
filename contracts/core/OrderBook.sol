@@ -717,14 +717,11 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _collateralDelta,
         bool _isLong,
         uint256 _triggerPrice,
-        bool _triggerAboveThreshold,
-        uint256 _executionFee
+        bool _triggerAboveThreshold
     ) external payable nonReentrant {
-        // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
-        require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
-        require(msg.value == _executionFee, "OrderBook: incorrect execution fee transferred");
+        require(msg.value > minExecutionFee, "OrderBook: insufficient execution fee");
 
         _createDecreaseOrder(
             msg.sender,
@@ -734,8 +731,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _sizeDelta,
             _isLong,
             _triggerPrice,
-            _triggerAboveThreshold,
-            _executionFee
+            _triggerAboveThreshold
         );
     }
 
@@ -747,8 +743,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _sizeDelta,
         bool _isLong,
         uint256 _triggerPrice,
-        bool _triggerAboveThreshold,
-        uint256 _executionFee
+        bool _triggerAboveThreshold
     ) private {
         uint256 _orderIndex = decreaseOrdersIndex[_account];
         DecreaseOrder memory order = DecreaseOrder(
@@ -760,7 +755,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _isLong,
             _triggerPrice,
             _triggerAboveThreshold,
-            _executionFee
+            msg.value
         );
         decreaseOrdersIndex[_account] = _orderIndex.add(1);
         decreaseOrders[_account][_orderIndex] = order;
@@ -775,7 +770,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _isLong,
             _triggerPrice,
             _triggerAboveThreshold,
-            _executionFee
+            msg.value
         );
     }
 
