@@ -419,7 +419,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _orderIndex,
             order.path,
             order.amountIn,
-            order.minOut,
+            _minOut,
             _triggerRatio,
             _triggerAboveThreshold,
             order.executionFee
