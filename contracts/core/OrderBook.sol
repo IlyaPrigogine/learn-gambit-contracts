@@ -870,7 +870,9 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
 
     function _transferInETH() private {
-        IWETH(weth).deposit{value: msg.value}();
+        if (msg.value != 0) {
+            IWETH(weth).deposit{value: msg.value}();
+        }
     }
 
     function _transferOutETH(uint256 _amountOut, address payable _receiver) private {
