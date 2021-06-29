@@ -566,7 +566,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         {
             // TODO USDG has no price
             uint256 _purchaseTokenAmountUsd = IVault(vault).tokenToUsdMin(_purchaseToken, _purchaseTokenAmount);
-            require(_purchaseTokenAmountUsd > minPurchaseTokenAmountUsd, "OrderBook: insufficient collateral");
+            require(_purchaseTokenAmountUsd >= minPurchaseTokenAmountUsd, "OrderBook: insufficient collateral");
         }
 
         _createIncreaseOrder(
