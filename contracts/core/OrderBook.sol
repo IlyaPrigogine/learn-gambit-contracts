@@ -472,10 +472,10 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         bool _triggerAboveThreshold,
         uint256 _triggerPrice, 
         address _indexToken,
-        bool _maximisePrice,
+        bool _maximizePrice,
         bool _raise
     ) public view returns (uint256, bool) {
-        uint256 currentPrice = _maximisePrice
+        uint256 currentPrice = _maximizePrice
             ? IVault(vault).getMaxPrice(_indexToken) : IVault(vault).getMinPrice(_indexToken);
         bool isPriceValid = _triggerAboveThreshold ? currentPrice > _triggerPrice : currentPrice < _triggerPrice;
         if (_raise) {
