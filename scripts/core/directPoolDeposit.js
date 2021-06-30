@@ -10,15 +10,15 @@ async function main() {
 
   const btc = {
     address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
-    amount: "0.3"
+    amount: "0"
   }
   const eth = {
     address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-    amount: "0"
+    amount: "6"
   }
   const bnb = {
     address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
-    amount: "35"
+    amount: "0"
   }
   const busd = {
     address: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
@@ -26,7 +26,7 @@ async function main() {
   }
   const usdc = {
     address: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-    amount: "10000"
+    amount: "0"
   }
   const usdt = {
     address: "0x55d398326f99059fF775485246999027B3197955",
