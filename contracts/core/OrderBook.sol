@@ -281,6 +281,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
         require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
         require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
+        require(_amountIn > 0, "OrderBook: invalid _amountIn");
 
         require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
         if (_shouldWrap) {
