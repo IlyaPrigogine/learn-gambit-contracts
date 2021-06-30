@@ -370,6 +370,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         address[] memory _path,
         uint256 _triggerRatio
     ) public view returns (bool) {
+        require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
+        
         // limit orders don't need this validation because minOut is enough
         // so this validation handles scenarios for stop orders only
         // when a user wants to swap when a price of tokenB increases relative to tokenA
