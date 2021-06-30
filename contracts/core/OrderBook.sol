@@ -283,7 +283,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
         require(_amountIn > 0, "OrderBook: invalid _amountIn");
 
-        require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
+        require(_executionFee >= minExecutionFee, "OrderBook: insufficient execution fee");
         if (_shouldWrap) {
             require(_path[0] == weth, "OrderBook: only weth could be wrapped");
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
@@ -538,7 +538,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
-        require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
+        require(_executionFee >= minExecutionFee, "OrderBook: insufficient execution fee");
         if (_shouldWrap) {
             require(_path[0] == weth, "OrderBook: only weth could be wrapped");
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
