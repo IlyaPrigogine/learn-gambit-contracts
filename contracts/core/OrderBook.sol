@@ -202,6 +202,18 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 amountOut
     );
 
+    event Initialize(
+        address router,
+        address vault,
+        address weth,
+        address usdg,
+        uint256 minExecutionFee,
+        uint256 minPurchaseTokenAmountUsd
+    );
+    event UpdateMinExecutionFee(uint256 minExecutionFee);
+    event UpdateMinPurchaseTokenAmountUsd(uint256 minPurchaseTokenAmountUsd);
+    event UpdateGov(address gov);
+
     modifier onlyGov() {
         require(msg.sender == gov, "OrderBook: forbidden");
         _;
@@ -228,6 +240,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         usdg = _usdg;
         minExecutionFee = _minExecutionFee;
         minPurchaseTokenAmountUsd = _minPurchaseTokenAmountUsd;
+
+        emit Initialize(_router, _vault, _weth, _usdg, _minExecutionFee, _minPurchaseTokenAmountUsd);
     }
 
     receive() external payable {
@@ -236,14 +250,20 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
     function setMinExecutionFee(uint256 _minExecutionFee) external onlyGov {
         minExecutionFee = _minExecutionFee;
+
+        emit UpdateMinExecutionFee(_minExecutionFee);
     }
 
     function setMinPurchaseTokenAmountUsd(uint256 _minPurchaseTokenAmountUsd) external onlyGov {
         minPurchaseTokenAmountUsd = _minPurchaseTokenAmountUsd;
+
+        emit UpdateMinPurchaseTokenAmountUsd(_minPurchaseTokenAmountUsd);
     }
 
     function setGov(address _gov) external onlyGov {
         gov = _gov;
+
+        emit UpdateGov(_gov);
     }
 
     function getSwapOrder(address _account, uint256 _orderIndex) override public view returns (
@@ -280,7 +300,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
         require(_amountIn > 0, "OrderBook: invalid _amountIn");
         require(_executionFee >= minExecutionFee, "OrderBook: insufficient execution fee");
-        
+
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
