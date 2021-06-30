@@ -362,16 +362,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         return redemptionAmount.mul(otherTokenPrice).div(10 ** otherTokenDecimals);
     }
 
-    function getUsdgMaxPrice() public pure returns (uint256) {
-        return 1 * PRICE_PRECISION;
-    }
-
     function validateSwapOrderPriceWithTriggerAboveThreshold(
         address[] memory _path,
         uint256 _triggerRatio
     ) public view returns (bool) {
         require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
-        
+
         // limit orders don't need this validation because minOut is enough
         // so this validation handles scenarios for stop orders only
         // when a user wants to swap when a price of tokenB increases relative to tokenA
@@ -393,7 +389,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         }
 
         if (tokenB == usdg) {
-            tokenBPrice = getUsdgMaxPrice();
+            tokenBPrice = PRICE_PRECISION;
         } else {
             tokenBPrice = IVault(vault).getMaxPrice(tokenB);
         }
