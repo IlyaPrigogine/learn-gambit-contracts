@@ -19,8 +19,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
-    uint256 public constant PRICE_PRECISION = 10e30;
-    uint256 public constant USDG_PRECISION = 10e18;
+    uint256 public constant PRICE_PRECISION = 1e30;
+    uint256 public constant USDG_PRECISION = 1e18;
 
     struct IncreaseOrder {
         address account;
