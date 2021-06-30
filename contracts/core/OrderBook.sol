@@ -319,12 +319,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         emit CreateSwapOrder(
             _account,
             _orderIndex,
-            order.path,
-            order.amountIn,
-            order.minOut,
-            order.triggerRatio,
-            order.triggerAboveThreshold,
-            order.executionFee
+            _path,
+            _amountIn,
+            _minOut,
+            _triggerRatio,
+            _triggerAboveThreshold,
+            _executionFee
         );
     }
 
