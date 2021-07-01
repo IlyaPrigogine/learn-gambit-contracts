@@ -111,7 +111,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 collateralDelta,
         uint256 sizeDelta,
         bool isLong,
-        uint256 price
+        uint256 price,
+        uint256 fee
     );
     event DecreasePosition(
         bytes32 key,
@@ -121,7 +122,8 @@ contract Vault is ReentrancyGuard, IVault {
         uint256 collateralDelta,
         uint256 sizeDelta,
         bool isLong,
-        uint256 price
+        uint256 price,
+        uint256 fee
     );
     event LiquidatePosition(
         bytes32 key,
@@ -488,7 +490,7 @@ contract Vault is ReentrancyGuard, IVault {
             _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, fee));
         }
 
-        emit IncreasePosition(key, _account, _collateralToken, _indexToken, collateralDeltaUsd, _sizeDelta, _isLong, price);
+        emit IncreasePosition(key, _account, _collateralToken, _indexToken, collateralDeltaUsd, _sizeDelta, _isLong, price, fee);
         emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, position.realisedPnl);
     }
 
@@ -527,7 +529,7 @@ contract Vault is ReentrancyGuard, IVault {
             }
 
             uint256 price = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
-            emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, price);
+            emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, price, usdOut.sub(usdOutAfterFee));
             emit UpdatePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, position.realisedPnl);
         } else {
             if (_isLong) {
@@ -536,7 +538,7 @@ contract Vault is ReentrancyGuard, IVault {
             }
 
             uint256 price = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
-            emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, price);
+            emit DecreasePosition(key, _account, _collateralToken, _indexToken, _collateralDelta, _sizeDelta, _isLong, price, usdOut.sub(usdOutAfterFee));
             emit ClosePosition(key, position.size, position.collateral, position.averagePrice, position.entryFundingRate, position.reserveAmount, position.realisedPnl);
 
             delete positions[key];
