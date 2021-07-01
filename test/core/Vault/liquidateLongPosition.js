@@ -154,7 +154,7 @@ describe("Vault.liquidateLongPosition", function () {
     expect(await vault.feeReserves(btc.address)).eq(1175)
     expect(await vault.reservedAmounts(btc.address)).eq(0)
     expect(await vault.guaranteedUsd(btc.address)).eq(0)
-    expect(await vault.poolAmounts(btc.address)).eq(262756 - 219)
+    expect(await vault.poolAmounts(btc.address)).eq(262756 - 219 - 206)
     expect(await btc.balanceOf(user2.address)).eq(11494) // 0.00011494 * 43500 => ~5
 
     expect(await btc.balanceOf(vault.address)).eq(263506)
@@ -162,14 +162,14 @@ describe("Vault.liquidateLongPosition", function () {
     const balance = await btc.balanceOf(vault.address)
     const poolAmount = await vault.poolAmounts(btc.address)
     const feeReserve = await vault.feeReserves(btc.address)
-    expect(poolAmount.add(feeReserve).sub(balance)).eq(206)
+    expect(poolAmount.add(feeReserve).sub(balance)).eq(0)
 
-    const balanceUpdater = await deployContract("BalanceUpdater", [])
-    await btc.mint(wallet.address, 206)
-    await usdg.connect(user1).transfer(wallet.address, expandDecimals(1, 18))
-    await btc.connect(wallet).approve(balanceUpdater.address, 206)
-    await usdg.connect(wallet).approve(balanceUpdater.address, expandDecimals(1, 18))
-    await balanceUpdater.updateBalance(vault.address, btc.address, usdg.address, expandDecimals(1, 18))
+    // const balanceUpdater = await deployContract("BalanceUpdater", [])
+    // await btc.mint(wallet.address, 206)
+    // await usdg.connect(user1).transfer(wallet.address, expandDecimals(1, 18))
+    // await btc.connect(wallet).approve(balanceUpdater.address, 206)
+    // await usdg.connect(wallet).approve(balanceUpdater.address, expandDecimals(1, 18))
+    // await balanceUpdater.updateBalance(vault.address, btc.address, usdg.address, expandDecimals(1, 18))
 
     await vault.withdrawFees(btc.address, user0.address)
 
@@ -265,7 +265,7 @@ describe("Vault.liquidateLongPosition", function () {
     expect(await vault.feeReserves(btc.address)).eq(1175)
     expect(await vault.reservedAmounts(btc.address)).eq(0)
     expect(await vault.guaranteedUsd(btc.address)).eq(0)
-    expect(await vault.poolAmounts(btc.address)).eq(262756 - 219)
+    expect(await vault.poolAmounts(btc.address)).eq(262756 - 219 - 206)
     expect(await btc.balanceOf(user2.address)).eq(11494) // 0.00011494 * 43500 => ~5
   })
 })

@@ -573,6 +573,7 @@ contract Vault is ReentrancyGuard, IVault {
         _decreaseReservedAmount(_collateralToken, position.reserveAmount);
         if (_isLong) {
             _decreaseGuaranteedUsd(_collateralToken, position.size.sub(position.collateral));
+            _decreasePoolAmount(_collateralToken, usdToTokenMin(_collateralToken, marginFees));
         }
 
         uint256 markPrice = _isLong ? getMinPrice(_indexToken) : getMaxPrice(_indexToken);
