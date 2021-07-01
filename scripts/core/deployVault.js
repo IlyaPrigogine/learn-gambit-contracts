@@ -2,20 +2,40 @@ const { deployContract, contractAt , sendTxn } = require("../shared/helpers")
 const { expandDecimals } = require("../../test/shared/utilities")
 const { toUsd } = require("../../test/shared/units")
 
+const network = (process.env.HARDHAT_NETWORK || 'mainnet');
+const tokens = require('./tokens')[network];
+
 async function main() {
-  const nativeToken = { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c" }
+  const {
+    btc,
+    eth,
+    nativeToken
+  } = tokens;
+
+  const bnb = nativeToken;
   const vault = await deployContract("Vault", [])
   const usdg = await deployContract("USDG", [vault.address])
   const router = await deployContract("Router", [vault.address, usdg.address, nativeToken.address])
   const vaultPriceFeed = await deployContract("VaultPriceFeed", [])
 
-  const btc = { address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c" }
-  const eth = { address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8" }
-  const bnb = nativeToken
+  const orderBook = await deployContract("OrderBook", []);
+
+  await sendTxn(orderBook.initialize(
+    router.address,
+    vault.address,
+    nativeToken.address,
+    usdg.address,
+    500000, // min execution fee
+    expandDecimals(5, 30) // min purchase token amount usd
+  ));
+
+  // MAINNET values
+  // but probably not necessary for testing purposes because isAmmEanbled = false
   const bnbBusd = { address: "0x58F876857a02D6762E0101bb5C46A8c1ED44Dc16" }
   const ethBnb = { address: "0x74E4716E431f45807DCF19f284c7aA99F18a4fbc" }
   const btcBnb = { address: "0x61EB789d75A95CAa3fF50ed7E47b96c132fEc082" }
 
+  await sendTxn(vaultPriceFeed.setIsAmmEnabled(false), "vaultPriceFeed.setIsAmmEnabled");
   await sendTxn(vaultPriceFeed.setTokens(btc.address, eth.address, bnb.address), "vaultPriceFeed.setTokens")
   await sendTxn(vaultPriceFeed.setPairs(bnbBusd.address, ethBnb.address, btcBnb.address), "vaultPriceFeed.setPairs")
 

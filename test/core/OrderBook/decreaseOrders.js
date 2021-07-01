@@ -134,7 +134,6 @@ describe("OrderBook, decrease position orders", () => {
             getDefault(props, 'isLong', defaults.isLong),
             getDefault(props, 'triggerPrice', defaults.triggerPrice),
             getDefault(props, 'triggerAboveThreshold', defaults.triggerAboveThreshold),
-            getDefault(props, 'executionFee', defaults.executionFee),
             {value: getDefault(props, 'value', props.executionFee || defaults.executionFee)}
         );
     }
@@ -170,14 +169,6 @@ describe("OrderBook, decrease position orders", () => {
     	await expect(defaultCreateDecreaseOrder({
     		executionFee: 100
     	})).to.be.revertedWith("OrderBook: insufficient execution fee");
-
-    	await expect(defaultCreateDecreaseOrder({
-    		value: defaults.executionFee.add(1)
-    	})).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
-
-    	await expect(defaultCreateDecreaseOrder({
-    		value: defaults.executionFee.sub(1)
-    	})).to.be.revertedWith("OrderBook: incorrect execution fee transferred");
     })
 
     it("Create decrease order, long", async () => {

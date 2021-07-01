@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.12;
+pragma solidity ^0.6.0;
 
 import "../libraries/math/SafeMath.sol";
 import "../libraries/token/IERC20.sol";
@@ -19,8 +19,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     using SafeERC20 for IERC20;
     using Address for address payable;
 
-    uint256 public constant PRICE_PRECISION = 10 ** 30;
-    uint256 public constant USDG_PRECISION = 10 ** 18;
+    uint256 public constant PRICE_PRECISION = 1e30;
+    uint256 public constant USDG_PRECISION = 1e18;
 
     struct IncreaseOrder {
         address account;
@@ -73,7 +73,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
     event CreateIncreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         address purchaseToken,
         uint256 purchaseTokenAmount,
         address indexToken,
@@ -85,7 +85,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event CancelIncreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         address purchaseToken,
         uint256 purchaseTokenAmount,
         address indexToken,
@@ -97,7 +97,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event ExecuteIncreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         address purchaseToken,
         uint256 purchaseTokenAmount,
         address indexToken,
@@ -110,14 +110,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event UpdateIncreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         uint256 sizeDelta,
         uint256 triggerPrice,
         bool triggerAboveThreshold
     );
     event CreateDecreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -129,7 +129,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event CancelDecreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -141,7 +141,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event ExecuteDecreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         address collateralToken,
         uint256 collateralDelta,
         address indexToken,
@@ -154,7 +154,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event UpdateDecreaseOrder(
         address indexed account,
-        uint256 indexed index,
+        uint256 orderIndex,
         uint256 collateralDelta,
         uint256 sizeDelta,
         uint256 triggerPrice,
@@ -182,7 +182,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     );
     event UpdateSwapOrder(
         address account,
-        uint256 orderIndex,
+        uint256 ordexIndex,
         address[] path,
         uint256 amountIn,
         uint256 minOut,
@@ -201,6 +201,18 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 executionFee,
         uint256 amountOut
     );
+
+    event Initialize(
+        address router,
+        address vault,
+        address weth,
+        address usdg,
+        uint256 minExecutionFee,
+        uint256 minPurchaseTokenAmountUsd
+    );
+    event UpdateMinExecutionFee(uint256 minExecutionFee);
+    event UpdateMinPurchaseTokenAmountUsd(uint256 minPurchaseTokenAmountUsd);
+    event UpdateGov(address gov);
 
     modifier onlyGov() {
         require(msg.sender == gov, "OrderBook: forbidden");
@@ -228,6 +240,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         usdg = _usdg;
         minExecutionFee = _minExecutionFee;
         minPurchaseTokenAmountUsd = _minPurchaseTokenAmountUsd;
+
+        emit Initialize(_router, _vault, _weth, _usdg, _minExecutionFee, _minPurchaseTokenAmountUsd);
     }
 
     receive() external payable {
@@ -236,14 +250,41 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
 
     function setMinExecutionFee(uint256 _minExecutionFee) external onlyGov {
         minExecutionFee = _minExecutionFee;
+
+        emit UpdateMinExecutionFee(_minExecutionFee);
     }
 
     function setMinPurchaseTokenAmountUsd(uint256 _minPurchaseTokenAmountUsd) external onlyGov {
         minPurchaseTokenAmountUsd = _minPurchaseTokenAmountUsd;
+
+        emit UpdateMinPurchaseTokenAmountUsd(_minPurchaseTokenAmountUsd);
     }
 
     function setGov(address _gov) external onlyGov {
         gov = _gov;
+
+        emit UpdateGov(_gov);
+    }
+
+    function getSwapOrder(address _account, uint256 _orderIndex) override public view returns (
+        address path0, 
+        address path1,
+        address path2,
+        uint256 amountIn,
+        uint256 minOut,
+        uint256 triggerRatio,
+        bool triggerAboveThreshold
+    ) {
+        SwapOrder memory order = swapOrders[_account][_orderIndex];
+        return (
+            order.path.length > 0 ? order.path[0] : address(0), 
+            order.path.length > 1 ? order.path[1] : address(0), 
+            order.path.length > 2 ? order.path[2] : address(0), 
+            order.amountIn,
+            order.minOut,
+            order.triggerRatio,
+            order.triggerAboveThreshold
+        );
     }
 
     function createSwapOrder(
@@ -255,13 +296,14 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _executionFee,
         bool _shouldWrap
     ) external payable nonReentrant {
+        require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
+        require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
+        require(_amountIn > 0, "OrderBook: invalid _amountIn");
+        require(_executionFee >= minExecutionFee, "OrderBook: insufficient execution fee");
+
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
-        require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
-        require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
-
-        require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
         if (_shouldWrap) {
             require(_path[0] == weth, "OrderBook: only weth could be wrapped");
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
@@ -298,12 +340,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         emit CreateSwapOrder(
             _account,
             _orderIndex,
-            order.path,
-            order.amountIn,
-            order.minOut,
-            order.triggerRatio,
-            order.triggerAboveThreshold,
-            order.executionFee
+            _path,
+            _amountIn,
+            _minOut,
+            _triggerRatio,
+            _triggerAboveThreshold,
+            _executionFee
         );
     }
 
@@ -341,15 +383,12 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         return redemptionAmount.mul(otherTokenPrice).div(10 ** otherTokenDecimals);
     }
 
-    function getUsdgMaxPrice() public pure returns (uint256) {
-        return 1 * PRICE_PRECISION;
-    }
-
     function validateSwapOrderPriceWithTriggerAboveThreshold(
         address[] memory _path,
-        uint256 _triggerRatio,
-        bool _raise
+        uint256 _triggerRatio
     ) public view returns (bool) {
+        require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
+
         // limit orders don't need this validation because minOut is enough
         // so this validation handles scenarios for stop orders only
         // when a user wants to swap when a price of tokenB increases relative to tokenA
@@ -371,7 +410,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         }
 
         if (tokenB == usdg) {
-            tokenBPrice = getUsdgMaxPrice();
+            tokenBPrice = PRICE_PRECISION;
         } else {
             tokenBPrice = IVault(vault).getMaxPrice(tokenB);
         }
@@ -379,9 +418,6 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 currentRatio = tokenBPrice.mul(PRICE_PRECISION).div(tokenAPrice);
 
         bool isValid = currentRatio > _triggerRatio;
-        if (_raise) {
-            require(isValid, "OrderBook: invalid price for execution");
-        }
         return isValid;
     }
 
@@ -398,7 +434,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _orderIndex,
             order.path,
             order.amountIn,
-            order.minOut,
+            _minOut,
             _triggerRatio,
             _triggerAboveThreshold,
             order.executionFee
@@ -412,10 +448,9 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         if (order.triggerAboveThreshold) {
             // gas optimisation
             // order.minAmount should prevent wrong price execution in case of simple limit order
-            validateSwapOrderPriceWithTriggerAboveThreshold(
-                order.path,
-                order.triggerRatio,
-                true
+            require(
+                validateSwapOrderPriceWithTriggerAboveThreshold(order.path, order.triggerRatio),
+                "OrderBook: invalid price for execution"
             );
         }
 
@@ -451,16 +486,60 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         bool _triggerAboveThreshold,
         uint256 _triggerPrice, 
         address _indexToken,
-        bool _maximisePrice,
+        bool _maximizePrice,
         bool _raise
     ) public view returns (uint256, bool) {
-        uint256 currentPrice = _maximisePrice
+        uint256 currentPrice = _maximizePrice
             ? IVault(vault).getMaxPrice(_indexToken) : IVault(vault).getMinPrice(_indexToken);
         bool isPriceValid = _triggerAboveThreshold ? currentPrice > _triggerPrice : currentPrice < _triggerPrice;
         if (_raise) {
             require(isPriceValid, "OrderBook: invalid price for execution");
         }
         return (currentPrice, isPriceValid);
+    }
+
+    function getDecreaseOrder(address _account, uint256 _orderIndex) override public view returns (
+        address collateralToken,
+        uint256 collateralDelta,
+        address indexToken,
+        uint256 sizeDelta,
+        bool isLong,
+        uint256 triggerPrice,
+        bool triggerAboveThreshold
+    ) {
+        DecreaseOrder memory order = decreaseOrders[_account][_orderIndex];
+        return (
+            order.collateralToken,
+            order.collateralDelta,
+            order.indexToken,
+            order.sizeDelta,
+            order.isLong,
+            order.triggerPrice,
+            order.triggerAboveThreshold
+        );
+    }
+
+    function getIncreaseOrder(address _account, uint256 _orderIndex) override public view returns (
+        address purchaseToken, 
+        uint256 purchaseTokenAmount,
+        address collateralToken,
+        address indexToken,
+        uint256 sizeDelta,
+        bool isLong,
+        uint256 triggerPrice,
+        bool triggerAboveThreshold
+    ) {
+        IncreaseOrder memory order = increaseOrders[_account][_orderIndex];
+        return (
+            order.purchaseToken,
+            order.purchaseTokenAmount,
+            order.collateralToken,
+            order.indexToken,
+            order.sizeDelta,
+            order.isLong,
+            order.triggerPrice,
+            order.triggerAboveThreshold
+        );
     }
 
     function createIncreaseOrder(
@@ -479,7 +558,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
-        require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
+        require(_executionFee >= minExecutionFee, "OrderBook: insufficient execution fee");
         if (_shouldWrap) {
             require(_path[0] == weth, "OrderBook: only weth could be wrapped");
             require(msg.value == _executionFee.add(_amountIn), "OrderBook: incorrect value transferred");
@@ -499,8 +578,9 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         }
 
         {
+            // TODO USDG has no price
             uint256 _purchaseTokenAmountUsd = IVault(vault).tokenToUsdMin(_purchaseToken, _purchaseTokenAmount);
-            require(_purchaseTokenAmountUsd > minPurchaseTokenAmountUsd, "OrderBook: insufficient collateral");
+            require(_purchaseTokenAmountUsd >= minPurchaseTokenAmountUsd, "OrderBook: insufficient collateral");
         }
 
         _createIncreaseOrder(
@@ -651,14 +731,11 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _collateralDelta,
         bool _isLong,
         uint256 _triggerPrice,
-        bool _triggerAboveThreshold,
-        uint256 _executionFee
+        bool _triggerAboveThreshold
     ) external payable nonReentrant {
-        // always need this call because of mandatory executionFee user has to transfer in BNB
         _transferInETH();
 
-        require(_executionFee > minExecutionFee, "OrderBook: insufficient execution fee");
-        require(msg.value == _executionFee, "OrderBook: incorrect execution fee transferred");
+        require(msg.value > minExecutionFee, "OrderBook: insufficient execution fee");
 
         _createDecreaseOrder(
             msg.sender,
@@ -668,8 +745,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _sizeDelta,
             _isLong,
             _triggerPrice,
-            _triggerAboveThreshold,
-            _executionFee
+            _triggerAboveThreshold
         );
     }
 
@@ -681,8 +757,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _sizeDelta,
         bool _isLong,
         uint256 _triggerPrice,
-        bool _triggerAboveThreshold,
-        uint256 _executionFee
+        bool _triggerAboveThreshold
     ) private {
         uint256 _orderIndex = decreaseOrdersIndex[_account];
         DecreaseOrder memory order = DecreaseOrder(
@@ -694,7 +769,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _isLong,
             _triggerPrice,
             _triggerAboveThreshold,
-            _executionFee
+            msg.value
         );
         decreaseOrdersIndex[_account] = _orderIndex.add(1);
         decreaseOrders[_account][_orderIndex] = order;
@@ -709,7 +784,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _isLong,
             _triggerPrice,
             _triggerAboveThreshold,
-            _executionFee
+            msg.value
         );
     }
 
@@ -804,7 +879,9 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
     }
 
     function _transferInETH() private {
-        IWETH(weth).deposit{value: msg.value}();
+        if (msg.value != 0) {
+            IWETH(weth).deposit{value: msg.value}();
+        }
     }
 
     function _transferOutETH(uint256 _amountOut, address payable _receiver) private {
