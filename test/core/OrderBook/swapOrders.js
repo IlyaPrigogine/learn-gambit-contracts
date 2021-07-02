@@ -139,7 +139,8 @@ describe("OrderBook, swap orders", function () {
             collateralDelta: toUsd(BTC_PRICE),
             user: user0,
             isLong: true,
-            shouldWrap: false
+            shouldWrap: false,
+            shouldUnwrap: true
         };
     })
 
@@ -186,7 +187,8 @@ describe("OrderBook, swap orders", function () {
         props.triggerAboveThreshold = getDefault(props, 'triggerAboveThreshold', defaults.triggerAboveThreshold);
         props.executionFee = getDefault(props, 'executionFee', defaults.executionFee);
         props.value = getDefault(props, 'value', props.executionFee || defaults.executionFee);
-        props.shouldWrap = getDefault(props, 'shouldWrap', props.shouldWrap);
+        props.shouldWrap = getDefault(props, 'shouldWrap', defaults.shouldWrap);
+        props.shouldUnwrap = getDefault(props, 'shouldUnwrap', defaults.shouldUnwrap);
 
         const tx = await orderBook.connect(getDefault(props, 'user', defaults.user)).createSwapOrder(
             props.path,
@@ -196,6 +198,7 @@ describe("OrderBook, swap orders", function () {
             props.triggerAboveThreshold,
             props.executionFee,
             props.shouldWrap,
+            props.shouldUnwrap,
             {value: props.value}
         );
 
@@ -393,6 +396,35 @@ describe("OrderBook, swap orders", function () {
         });
     });
 
+    it("createSwapOrder, DAI -> WBNB, shouldUnwrap = false", async () => {
+        const triggerRatio = getTriggerRatio(toUsd(1), toUsd(310));
+        const amountIn = expandDecimals(100, 18);
+
+        let tx, props;
+        [tx, props] = await defaultCreateSwapOrder({
+            path: [dai.address, bnb.address],
+            triggerRatio,
+            triggerAboveThreshold: false,
+            amountIn,
+            shouldUnwrap: false,
+            value: defaults.executionFee
+        });
+        reportGasUsed(provider, tx, "createSwapOrder");
+
+        const order = await getCreatedSwapOrder(defaults.user.address);
+
+        validateOrderFields(order, {
+            account: defaults.user.address,
+            triggerRatio,
+            triggerAboveThreshold: false,
+            path: [dai.address, btc.address],
+            minOut: props.minOut,
+            executionFee: defaults.executionFee,
+            shouldUnwrap: false,
+            amountIn
+        });
+    });
+
     it("createSwapOrder, two orders", async () => {
         const triggerRatio1 = getTriggerRatio(toUsd(58000), toUsd(1));
         let tx1;
@@ -545,6 +577,42 @@ describe("OrderBook, swap orders", function () {
 
         const userBalanceAfter = await defaults.user.getBalance();
         expect(userBalanceAfter.gt(userBalanceBefore.add(minOut)), 'userBalanceAfter').to.be.true;
+
+        const order = await getCreatedSwapOrder(defaults.user.address, 0);
+        expect(order.account).to.be.equal(ZERO_ADDRESS);
+    });
+
+    it("executeSwapOrder, triggerAboveThreshold == false, DAI -> WBNB, shouldUnwrap = false", async () => {
+        const amountIn = expandDecimals(100, 18);
+        const value = defaults.executionFee;
+        const path = [dai.address, bnb.address];
+        const minOut = await getMinOut(
+            getTriggerRatio(toUsd(1), toUsd(BNB_PRICE + 50)),
+            path,
+            amountIn
+        );
+
+        await defaultCreateSwapOrder({
+            path,
+            triggerAboveThreshold: false,
+            amountIn,
+            minOut,
+            shouldUnwrap: false,
+            value
+        });
+
+        const executor = user1;
+        const executorBalanceBefore = await executor.getBalance();
+        const userWbnbBalanceBefore = await bnb.balanceOf(defaults.user.address);
+
+        const tx = await orderBook.executeSwapOrder(defaults.user.address, 0, executor.address);
+        reportGasUsed(provider, tx, 'executeSwapOrder');
+
+        const executorBalanceAfter = await executor.getBalance();
+        expect(executorBalanceAfter, 'executorBalanceAfter').to.be.equal(executorBalanceBefore.add(defaults.executionFee));
+
+        const userWbnbBalanceAfter = await bnb.balanceOf(defaults.user.address);
+        expect(userWbnbBalanceAfter.gt(userWbnbBalanceBefore.add(minOut)), 'userWbnbBalanceAfter').to.be.true;
 
         const order = await getCreatedSwapOrder(defaults.user.address, 0);
         expect(order.account).to.be.equal(ZERO_ADDRESS);

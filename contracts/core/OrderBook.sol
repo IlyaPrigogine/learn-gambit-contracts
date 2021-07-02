@@ -52,6 +52,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 minOut;
         uint256 triggerRatio;
         bool triggerAboveThreshold;
+        bool shouldUnwrap;
         uint256 executionFee;
     }
 
@@ -168,6 +169,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 minOut,
         uint256 triggerRatio,
         bool triggerAboveThreshold,
+        bool shouldUnwrap,
         uint256 executionFee
     );
     event CancelSwapOrder(
@@ -178,6 +180,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 minOut,
         uint256 triggerRatio,
         bool triggerAboveThreshold,
+        bool shouldUnwrap,
         uint256 executionFee
     );
     event UpdateSwapOrder(
@@ -188,6 +191,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 minOut,
         uint256 triggerRatio,
         bool triggerAboveThreshold,
+        bool shouldUnwrap,
         uint256 executionFee
     );
     event ExecuteSwapOrder(
@@ -198,6 +202,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 minOut,
         uint256 triggerRatio,
         bool triggerAboveThreshold,
+        bool shouldUnwrap,
         uint256 executionFee,
         uint256 amountOut
     );
@@ -294,7 +299,8 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _triggerRatio, // tokenB / tokenA
         bool _triggerAboveThreshold,
         uint256 _executionFee,
-        bool _shouldWrap
+        bool _shouldWrap,
+        bool _shouldUnwrap
     ) external payable nonReentrant {
         require(_path.length == 2 || _path.length == 3, "OrderBook: invalid _path.length");
         require(_path[0] != _path[_path.length - 1], "OrderBook: invalid _path");
@@ -312,7 +318,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             IRouter(router).pluginTransfer(_path[0], msg.sender, address(this), _amountIn);
         }
 
-        _createSwapOrder(msg.sender, _path, _amountIn, _minOut, _triggerRatio, _triggerAboveThreshold, _executionFee);
+        _createSwapOrder(msg.sender, _path, _amountIn, _minOut, _triggerRatio, _triggerAboveThreshold, _shouldUnwrap, _executionFee);
     }
 
     function _createSwapOrder(
@@ -322,6 +328,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         uint256 _minOut,
         uint256 _triggerRatio,
         bool _triggerAboveThreshold,
+        bool _shouldUnwrap,
         uint256 _executionFee
     ) private {
         uint256 _orderIndex = swapOrdersIndex[_account];
@@ -332,6 +339,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _minOut,
             _triggerRatio,
             _triggerAboveThreshold,
+            _shouldUnwrap,
             _executionFee
         );
         swapOrdersIndex[_account] = _orderIndex.add(1);
@@ -345,6 +353,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _minOut,
             _triggerRatio,
             _triggerAboveThreshold,
+            _shouldUnwrap,
             _executionFee
         );
     }
@@ -370,6 +379,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             order.minOut,
             order.triggerRatio,
             order.triggerAboveThreshold,
+            order.shouldUnwrap,
             order.executionFee
         );
     }
@@ -437,6 +447,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             _minOut,
             _triggerRatio,
             _triggerAboveThreshold,
+            order.shouldUnwrap,
             order.executionFee
         );
     }
@@ -459,7 +470,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
         IERC20(order.path[0]).safeTransfer(vault, order.amountIn);
 
         uint256 _amountOut;
-        if (order.path[order.path.length - 1] == weth) {
+        if (order.path[order.path.length - 1] == weth && order.shouldUnwrap) {
             _amountOut = _swap(order.path, order.minOut, address(this));
             _transferOutETH(_amountOut, payable(order.account));
         } else {
@@ -477,6 +488,7 @@ contract OrderBook is ReentrancyGuard, IOrderBook {
             order.minOut,
             order.triggerRatio,
             order.triggerAboveThreshold,
+            order.shouldUnwrap,
             order.executionFee,
             _amountOut
         );
