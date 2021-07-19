@@ -59,7 +59,7 @@ contract Vault is ReentrancyGuard, IVault {
     uint256 public override fundingRateFactor;
 
     uint256 public maxGasPrice;
-    uint256 public maxDebtBasisPoints;
+    uint256 public override maxDebtBasisPoints;
 
     bool public includeAmmPrice = true;
 
@@ -677,7 +677,7 @@ contract Vault is ReentrancyGuard, IVault {
         return collateral.add(poolAmounts[_token]).sub(reservedAmounts[_token]);
     }
 
-    function getRedemptionCollateralUsd(address _token) public view returns (uint256) {
+    function getRedemptionCollateralUsd(address _token) public override view returns (uint256) {
         return tokenToUsdMin(_token, getRedemptionCollateral(_token));
     }
 

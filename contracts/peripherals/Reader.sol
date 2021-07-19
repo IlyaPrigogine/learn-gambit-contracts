@@ -15,6 +15,17 @@ contract Reader {
     using SafeMath for uint256;
 
     uint256 public constant BASIS_POINTS_DIVISOR = 10000;
+    uint256 public constant PRICE_PRECISION = 10 ** 30;
+    uint256 public constant USDG_DECIMALS = 18;
+
+    function getMaxAmountOutBeforeDebtExceeded(IVault _vault, address _token) public view returns (uint256) {
+        uint256 maxDebtBasisPoints = _vault.maxDebtBasisPoints();
+        uint256 redemptionCollateralUsd = _vault.getRedemptionCollateralUsd(_token);
+        uint256 usdgDebt = _vault.usdgAmounts(_token).mul(PRICE_PRECISION).div(10 ** USDG_DECIMALS);
+        uint256 maxUsdAmount = redemptionCollateralUsd.mul(maxDebtBasisPoints).sub(BASIS_POINTS_DIVISOR.mul(usdgDebt)).div(maxDebtBasisPoints.sub(BASIS_POINTS_DIVISOR));
+        uint256 price = _vault.getMaxPrice(_token);
+        return maxUsdAmount.div(price);
+    }
 
     function getMaxAmountIn(IVault _vault, address _tokenIn, address _tokenOut) public view returns (uint256) {
         uint256 priceIn = _vault.getMinPrice(_tokenIn);
@@ -22,6 +33,14 @@ contract Reader {
         uint256 poolAmount = _vault.poolAmounts(_tokenOut);
         uint256 reservedAmount = _vault.reservedAmounts(_tokenOut);
         uint256 availableAmount = poolAmount.sub(reservedAmount);
+
+        if (!_vault.stableTokens(_tokenOut)) {
+            uint256 maxAmountOut = getMaxAmountOutBeforeDebtExceeded(_vault, _tokenOut);
+
+            if (maxAmountOut < availableAmount) {
+                availableAmount = maxAmountOut;
+            }
+        }
 
         return availableAmount.mul(priceOut).div(priceIn);
     }
