@@ -4,6 +4,7 @@ pragma solidity 0.6.12;
 
 interface IVault {
     function maxDebtBasisPoints() external view returns (uint256);
+    function setMaxDebtBasisPoints(uint256 _maxDebtBasisPoints) external;
     function getRedemptionCollateralUsd(address _token) external view returns (uint256);
     function setIsMintingEnabled(bool _isMintingEnabled) external;
     function setIsSwapEnabled(bool _isSwapEnabled) external;

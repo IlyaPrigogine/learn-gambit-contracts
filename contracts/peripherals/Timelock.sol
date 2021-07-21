@@ -58,23 +58,27 @@ contract Timelock {
         );
     }
 
+    function setMaxDebtBasisPoints(address _vault, uint256 _maxDebtBasisPoints) external onlyAdmin {
+        IVault(_vault).setMaxDebtBasisPoints(_maxDebtBasisPoints);
+    }
+
     function setTokenConfig(
         address _vault,
         address _token,
+        uint256 _redemptionBps,
         uint256 _minProfitBps
     ) external onlyAdmin {
         require(_minProfitBps <= 500, "Timelock: invalid _minProfitBps");
 
         IVault vault = IVault(_vault);
         uint256 tokenDecimals = vault.tokenDecimals(_token);
-        uint256 redemptionBps = vault.redemptionBasisPoints(_token);
         bool isStable = vault.stableTokens(_token);
         bool isShortable = vault.shortableTokens(_token);
 
         IVault(_vault).setTokenConfig(
             _token,
             tokenDecimals,
-            redemptionBps,
+            _redemptionBps,
             _minProfitBps,
             isStable,
             isShortable

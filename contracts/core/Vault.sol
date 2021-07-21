@@ -242,7 +242,7 @@ contract Vault is ReentrancyGuard, IVault {
         maxGasPrice = _maxGasPrice;
     }
 
-    function setMaxDebtBasisPoints(uint256 _maxDebtBasisPoints) external {
+    function setMaxDebtBasisPoints(uint256 _maxDebtBasisPoints) external override {
         _onlyGov();
         require(_maxDebtBasisPoints > 0, "Vault: invalid _maxDebtBasisPoints");
         maxDebtBasisPoints = _maxDebtBasisPoints;
