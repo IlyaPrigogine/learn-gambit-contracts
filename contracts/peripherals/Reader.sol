@@ -24,7 +24,8 @@ contract Reader {
         uint256 usdgDebt = _vault.usdgAmounts(_token).mul(PRICE_PRECISION).div(10 ** USDG_DECIMALS);
         uint256 maxUsdAmount = redemptionCollateralUsd.mul(maxDebtBasisPoints).sub(BASIS_POINTS_DIVISOR.mul(usdgDebt)).div(maxDebtBasisPoints.sub(BASIS_POINTS_DIVISOR));
         uint256 price = _vault.getMaxPrice(_token);
-        return maxUsdAmount.div(price);
+        uint256 tokenDecimals = _vault.tokenDecimals(_token);
+        return maxUsdAmount.mul(10 ** tokenDecimals).div(price);
     }
 
     function getMaxAmountIn(IVault _vault, address _tokenIn, address _tokenOut) public view returns (uint256) {
@@ -42,7 +43,8 @@ contract Reader {
             }
         }
 
-        return availableAmount.mul(priceOut).div(priceIn);
+        uint256 amountIn = availableAmount.mul(priceOut).div(priceIn);
+        return _vault.adjustForDecimals(amountIn, _tokenOut, _tokenIn);
     }
 
     function getAmountOut(IVault _vault, address _tokenIn, address _tokenOut, uint256 _amountIn) public view returns (uint256, uint256) {

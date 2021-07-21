@@ -685,7 +685,7 @@ contract Vault is ReentrancyGuard, IVault {
         return redemptionBasisPoints[_token];
     }
 
-    function adjustForDecimals(uint256 _amount, address _tokenDiv, address _tokenMul) public view returns (uint256) {
+    function adjustForDecimals(uint256 _amount, address _tokenDiv, address _tokenMul) public view override returns (uint256) {
         uint256 decimalsDiv = _tokenDiv == usdg ? USDG_DECIMALS : tokenDecimals[_tokenDiv];
         uint256 decimalsMul = _tokenMul == usdg ? USDG_DECIMALS : tokenDecimals[_tokenMul];
         return _amount.mul(10 ** decimalsMul).div(10 ** decimalsDiv);

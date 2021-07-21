@@ -7,6 +7,7 @@ interface IVault {
     function getRedemptionCollateralUsd(address _token) external view returns (uint256);
     function setIsMintingEnabled(bool _isMintingEnabled) external;
     function setIsSwapEnabled(bool _isSwapEnabled) external;
+    function adjustForDecimals(uint256 _amount, address _tokenDiv, address _tokenMul) external view returns (uint256);
 
     function setFees(
         uint256 _swapFeeBasisPoints,
