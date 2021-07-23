@@ -18,15 +18,11 @@ async function main() {
   await sendTxn(vaultPriceFeed.setPairs(bnbBusd.address, ethBnb.address, btcBnb.address), "vaultPriceFeed.setPairs")
 
   await sendTxn(vaultPriceFeed.setMaxStrictPriceDeviation(expandDecimals(5, 28)), "vaultPriceFeed.setMaxStrictPriceDeviation") // 0.05 USD
-  await sendTxn(vaultPriceFeed.setPriceSampleSpace(2), "vaultPriceFeed.setPriceSampleSpace")
-  await sendTxn(vaultPriceFeed.setSpreadBasisPoints(btc.address, 5), "vaultPriceFeed.setSpreadBasisPoints(btc)")
-  await sendTxn(vaultPriceFeed.setSpreadBasisPoints(eth.address, 12), "vaultPriceFeed.setSpreadBasisPoints(eth)")
-  await sendTxn(vaultPriceFeed.setSpreadBasisPoints(bnb.address, 15), "vaultPriceFeed.setSpreadBasisPoints(eth)")
+  await sendTxn(vaultPriceFeed.setPriceSampleSpace(1), "vaultPriceFeed.setPriceSampleSpace")
 
   await sendTxn(vaultPriceFeed.setSecondaryPriceFeed(secondaryPriceFeed.address), "vaultPriceFeed.setSecondaryPriceFeed")
   await sendTxn(vaultPriceFeed.setIsSecondaryPriceEnabled(false), "vaultPriceFeed.isSecondaryPriceEnabled")
   await sendTxn(vaultPriceFeed.setUseV2Pricing(true), "vaultPriceFeed.useV2Pricing")
-  await sendTxn(vaultPriceFeed.setFavorPrimaryPrice(true), "vaultPriceFeed.setFavorPrimaryPrice")
 }
 
 main()
