@@ -1,7 +1,7 @@
 // price feeds https://docs.chain.link/docs/binance-smart-chain-addresses/
 
 module.exports = {
-  mainnet: {
+  bsc: {
     btcPriceFeed: { address: "0x264990fbd0A4796A3E3d8E37C4d5F87a3aCa5Ebf" },
     ethPriceFeed: { address: "0x9ef1B8c0E4F7dc8bF5719Ea496883DC6401d5b2e" },
     bnbPriceFeed: { address: "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE" },
