@@ -22,6 +22,9 @@ contract Reader {
         uint256 maxDebtBasisPoints = _vault.maxDebtBasisPoints();
         uint256 redemptionCollateralUsd = _vault.getRedemptionCollateralUsd(_token);
         uint256 usdgDebt = _vault.usdgAmounts(_token).mul(PRICE_PRECISION).div(10 ** USDG_DECIMALS);
+        if (redemptionCollateralUsd.mul(maxDebtBasisPoints) < BASIS_POINTS_DIVISOR.mul(usdgDebt)) {
+            return 0;
+        }
         uint256 maxUsdAmount = redemptionCollateralUsd.mul(maxDebtBasisPoints).sub(BASIS_POINTS_DIVISOR.mul(usdgDebt)).div(maxDebtBasisPoints.sub(BASIS_POINTS_DIVISOR));
         uint256 price = _vault.getMaxPrice(_token);
         uint256 tokenDecimals = _vault.tokenDecimals(_token);
