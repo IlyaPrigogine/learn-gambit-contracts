@@ -24,17 +24,17 @@ task("accounts", "Prints the list of accounts", async () => {
 module.exports = {
   networks: {
     hardhat: {},
-    bsc: {
-      url: BSC_URL,
-      chainId: 56,
-      gasPrice: 30000000000,
-      accounts: [BSC_DEPLOY_KEY]
-    },
+    // bsc: {
+    //   url: BSC_URL,
+    //   chainId: 56,
+    //   gasPrice: 30000000000,
+    //   // accounts: [BSC_DEPLOY_KEY]
+    // },
     testnet: {
       url: BSC_TESTNET_URL,
       chainId: 97,
       gasPrice: 20000000000,
-      accounts: [BSC_TESTNET_DEPLOY_KEY]
+      // accounts: [BSC_TESTNET_DEPLOY_KEY]
     }
   },
   etherscan: {

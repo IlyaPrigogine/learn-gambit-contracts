@@ -8,3 +8,5 @@ flattened
 #Hardhat files
 cache
 artifacts
+
+.idea
