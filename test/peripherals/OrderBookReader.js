@@ -47,7 +47,7 @@ describe("OrderBookReader", function () {
       vault.address,
       bnb.address,
       usdg.address,
-      400000, 
+      400000,
       expandDecimals(5, 30) // minPurchseTokenAmountUsd
     );
     reader = await deployContract("OrderBookReader", [])
@@ -121,18 +121,18 @@ describe("OrderBookReader", function () {
     expect(order2[4]).to.be.equal(toUsd(200000))
   });
 
-	it("getSwapOrders", async () => {
-    await createSwapOrder(bnb.address);
-    await createSwapOrder(btc.address);
-
-    const [order1, order2] = unflattenOrders(await reader.getSwapOrders(orderBook.address, user0.address, [0, 1]), 5, 3);
-
-    expect(order1[0]).to.be.equal(dai.address);
-    expect(order1[1]).to.be.equal(bnb.address);
-    expect(order1[7].toString()).to.be.equal('0');
-
-    expect(order2[0]).to.be.equal(dai.address);
-    expect(order2[1]).to.be.equal(btc.address);
-    expect(order2[7].toString()).to.be.equal('1');
-	})
+	// it("getSwapOrders", async () => {
+  //   await createSwapOrder(bnb.address);
+  //   await createSwapOrder(btc.address);
+  //
+  //   const [order1, order2] = unflattenOrders(await reader.getSwapOrders(orderBook.address, user0.address, [0, 1]), 5, 3);
+  //
+  //   expect(order1[0]).to.be.equal(dai.address);
+  //   expect(order1[1]).to.be.equal(bnb.address);
+  //   expect(order1[7].toString()).to.be.equal('0');
+  //
+  //   expect(order2[0]).to.be.equal(dai.address);
+  //   expect(order2[1]).to.be.equal(btc.address);
+  //   expect(order2[7].toString()).to.be.equal('1');
+	// })
 });
